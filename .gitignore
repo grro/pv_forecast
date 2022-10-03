@@ -127,11 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/pv_forecast/example.py
-/pv_forecast/test.py
-/pv_forecast/test_device_control.py
-/pv_forecast/train.csv
-/pv_forecast/train_compare.py
+/pvforecast/example.py
+/pvforecast/test.py
+/pvforecast/test_device_control.py
+/pvforecast/train.csv
+/pvforecast/train_compare.py
 /requirements.txt
 /pv_forecast.iml
 /.idea/
