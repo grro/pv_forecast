@@ -9,7 +9,7 @@ from typing import Optional
 from sklearn import svm
 from typing import List
 from dataclasses import dataclass
-from pvpower.weather_service import WeatherServiceForecast, WeatherForecast
+from pvpower.weather import WeatherStation, WeatherForecast
 
 
 @dataclass(frozen=True)
@@ -176,7 +176,7 @@ class ValueRecorder:
 
     @property
     def time(self) -> datetime:
-        return datetime.strptime(self.__time.strftime("%d.%m.%Y %H") + ":30", "%d.%m.%Y %H:%M")
+        return datetime.strptime(self.__time.strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
 
     @property
     def average(self) -> Optional[int]:
@@ -199,7 +199,7 @@ class PvPowerForecast:
     def __init__(self, station_id: str, train_dir: str = None):
         if train_dir is None:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
-        self.weather_forecast_service = WeatherServiceForecast(station_id)
+        self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
         self.__train_data_value_recorder = ValueRecorder()
         self.__estimator = Estimator()

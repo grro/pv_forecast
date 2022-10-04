@@ -21,7 +21,7 @@ class WeatherForecast:
     visibility: int
 
 
-class WeatherServiceForecast:
+class WeatherStation:
 
     def __init__(self, station: str):
         self.url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' + station + '/kml/MOSMIX_L_LATEST_K887.kmz'
@@ -38,7 +38,7 @@ class WeatherServiceForecast:
 
     def __read_values_by_datetime(self, forecast: List[Dict[str, Any]], time_steps: List[datetime], field_name: str):
         values = [param['dwd:value'].split() for param in forecast if param['@dwd:elementName'] == field_name][0]
-        return {WeatherServiceForecast.__datetime_to_string(time_steps[i]): int(float(values[i])) for i in range(0, len(time_steps))}
+        return {WeatherStation.__datetime_to_string(time_steps[i]): int(float(values[i])) for i in range(0, len(time_steps))}
 
     def __refresh_data(self, force: bool = False):
         if force or datetime.now() > self.__last_refresh + timedelta(minutes=15):
@@ -65,7 +65,7 @@ class WeatherServiceForecast:
                 logging.warning("error occurred calling " + self.url + " Got " + str(response.status_code) + " " + str(response.text))
 
     def __forecast_value(self, date: datetime, forecast_list: Dict[str,int]) -> Optional[int]:
-        date_string = WeatherServiceForecast.__datetime_to_string(date)
+        date_string = WeatherStation.__datetime_to_string(date)
         if date_string not in forecast_list.keys():
             self.__refresh_data(True)
         return forecast_list.get(date_string, None)

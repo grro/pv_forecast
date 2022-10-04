@@ -13,7 +13,7 @@ sudo pip install pv_forecast
 After this installation you should configure the library with your environment parameters.
 You have to set the closest DWD station id of the location of our PV system. To find the proper station id refer [DWD station list](https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102)     
 ```
-from pvpower.pv_forecast_service import PvPowerForecast
+from pvpower.forecast import PvPowerForecast
 
 dwd_station_id = 'L160'
 pv_power_forecast = PvPowerForecast(dwd_station_id)
