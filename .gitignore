@@ -135,3 +135,4 @@ dmypy.json
 /requirements.txt
 /pv_forecast.iml
 /.idea/
+/pvpower/deleteme.py

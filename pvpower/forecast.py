@@ -130,10 +130,10 @@ class Estimator:
     def __vectorize(self, sample: WeatherForecast) -> List[float]:
         return [self.__scale(sample.time.month, 12),
                 self.__scale(sample.time.hour, 24),
-                self.__scale(sample.irradiance, 1000),
-                self.__scale(sample.sunshine, 10000),
-                self.__scale(sample.probability_for_fog, 100),
-                self.__scale(sample.visibility, 100000)]
+                #self.__scale(sample.sunshine, 10000),
+                #self.__scale(sample.probability_for_fog, 100),
+                #self.__scale(sample.visibility, 100000),
+                self.__scale(sample.irradiance, 1000)]
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
         samples = [sample for sample in samples if sample.irradiance > 0]
@@ -220,7 +220,7 @@ class PvPowerForecast:
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
-    def add_train_sample(self, real_power: int):
+    def add_current_pv_power(self, real_power: int):
         if self.__train_data_value_recorder.same_hour(datetime.now()):
             self.__train_data_value_recorder.add(real_power)
         else:
@@ -237,7 +237,7 @@ class PvPowerForecast:
                 self.__retrain()
             self.__train_data_value_recorder.reset()
 
-    def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
+    def current_power_reading(self, sample: WeatherForecast) -> int:
         self.__retrain()
         return self.__estimator.predict(sample)
 
