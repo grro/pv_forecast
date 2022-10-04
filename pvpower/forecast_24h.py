@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import List
-from pvforecast.pv_forecast_service import PvPowerForecast, LabelledWeatherForecast
+from pvpower.pv_forecast_service import PvPowerForecast, LabelledWeatherForecast
 
 
 class Frame:
