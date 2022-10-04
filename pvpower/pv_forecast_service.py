@@ -9,7 +9,7 @@ from typing import Optional
 from sklearn import svm
 from typing import List
 from dataclasses import dataclass
-from pv_forecast.weather_service import WeatherServiceForecast, WeatherForecast
+from pvpower.weather_service import WeatherServiceForecast, WeatherForecast
 
 
 @dataclass(frozen=True)
