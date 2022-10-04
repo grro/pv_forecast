@@ -74,7 +74,7 @@ class Next24hours:
         now = datetime.strptime((datetime.now()).strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
         predictions = {}
         for weather_forecast in [pv_forecast.weather_forecast_service.forecast(prediction_time) for prediction_time in [now + timedelta(hours=i) for i in range(0, 40)]]:
-            predicted_value = pv_forecast.current_power_reading(weather_forecast)
+            predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
             if predicted_value is not None:
                 predictions[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
         return Next24hours(predictions)

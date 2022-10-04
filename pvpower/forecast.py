@@ -220,7 +220,7 @@ class PvPowerForecast:
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
-    def add_current_pv_power(self, real_power: int):
+    def current_power_reading(self, real_power: int):
         if self.__train_data_value_recorder.same_hour(datetime.now()):
             self.__train_data_value_recorder.add(real_power)
         else:
@@ -237,7 +237,7 @@ class PvPowerForecast:
                 self.__retrain()
             self.__train_data_value_recorder.reset()
 
-    def current_power_reading(self, sample: WeatherForecast) -> int:
+    def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         self.__retrain()
         return self.__estimator.predict(sample)
 
@@ -246,4 +246,4 @@ class PvPowerForecast:
         if sample is None:
             return None
         else:
-            return self.__estimator.predict(sample)
+            return self.predict_by_weather_forecast(sample)
