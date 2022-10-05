@@ -5,13 +5,8 @@ from pvpower.forecast import PvPowerForecast, LabelledWeatherForecast
 
 class TimeFrame:
 
-    def __init__(self, min_power_watt: int, hourly_forecasts: List[LabelledWeatherForecast]):
-        self.min_power_watt = min_power_watt
+    def __init__(self, hourly_forecasts: List[LabelledWeatherForecast]):
         self.__hourly_forecasts = hourly_forecasts
-        self.__surplus = []
-        for hourly_forecast in hourly_forecasts:
-            if hourly_forecast.power_watt > min_power_watt:
-                self.__surplus.append(hourly_forecast.power_watt - min_power_watt)
 
     @property
     def start_time(self) -> datetime:
@@ -26,12 +21,12 @@ class TimeFrame:
         return len(self.__hourly_forecasts)
 
     @property
-    def surplus_total(self):
-        return sum(self.__surplus)
+    def hourly_power(self) -> List[int]:
+        return [hourly_forecast.power_watt for hourly_forecast in self.__hourly_forecasts]
 
     @property
     def power_total(self) -> int:
-        return sum([hourly_forecast.power_watt for hourly_forecast in self.__hourly_forecasts])
+        return sum(self.hourly_power)
 
     def __lt__(self, other):
         return self.start_time < other.start_time
@@ -43,13 +38,17 @@ class TimeFrame:
         return self.__str__()
 
     def __str__(self) -> str:
-        return self.__hourly_forecasts[0].time.strftime("%H:%M") + " -> " + self.__hourly_forecasts[-1].time.strftime("%H") + ":59" + ":  surplus=" + str(self.__surplus) + " (total " + ", ".join([str(hourly_forecast.power_watt) for hourly_forecast in self.__hourly_forecasts]) + ")"
+        return self.__hourly_forecasts[0].time.strftime("%d.%m %H:%M") + " -> " + self.__hourly_forecasts[-1].time.strftime("%H") + ":59" + "; total: " + ", ".join([str(hourly_forecast.power_watt) for hourly_forecast in self.__hourly_forecasts])
 
 
 class TimeFrames:
 
     def __init__(self, frames: List[TimeFrame]):
-        self.__frames = sorted(frames)
+        self.__frames = sorted(frames, key=lambda frame: "{0:10d}".format(1000000-frame.power_total) + frame.start_time.strftime("%d.%m.%Y %H"), reverse=False)
+
+    def filter(self, min_watt_per_hour: int):
+        filtered_frames = [frame for frame in self.__frames if max(sorted(frame.hourly_power)) > min_watt_per_hour]
+        return TimeFrames(filtered_frames)
 
     def empty(self):
         return len(self.__frames) == 0
@@ -85,16 +84,14 @@ class Next24hours:
     def peek(self) -> int:
         return max(self.__prediction_values())
 
-    def extra_power_frames(self, base_power_watt: int, width_hours: int = 1) -> TimeFrames:
+    def frames(self, width_hours: int = 1) -> TimeFrames:
         frames = []
         times = list(self.predictions.keys())
         for offset_hour in range(0, 24+width_hours):
             forecasts = [self.predictions[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
-            frame = TimeFrame(base_power_watt, forecasts)
+            frame = TimeFrame(forecasts)
             frames.append(frame)
-        frames = [slot for slot in frames if slot.surplus_total > 0]
-        frames = [slot for slot in frames if slot.start_time <= datetime.now() + timedelta(hours=24)]
-        frames = sorted(frames, key=lambda slot: slot.surplus_total, reverse=True)
+        frames = [frame for frame in frames if frame.start_time <= datetime.now() + timedelta(hours=24)]
         return TimeFrames(frames)
 
     def __str__(self):
