@@ -1,5 +1,6 @@
 import logging
 import os
+import gzip
 from abc import ABC, abstractmethod
 from pathlib import Path
 from os.path import exists
@@ -84,8 +85,13 @@ class TrainSampleLog:
     def append(self, sample: LabelledWeatherForecast):
         with self.lock:
             exits = exists(self.filename)
-            #with gzip.GzipFile(self.__filename + ".json.gz", "ab") as file:
             with open(self.filename, "ab") as file:   #remove me
+                if not exits:
+                    file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
+                line = sample.to_csv() + "\n"
+                file.write(line.encode(encoding='UTF-8'))
+
+            with gzip.GzipFile(self.filename + ".gz", "ab") as file:
                 if not exits:
                     file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 line = sample.to_csv() + "\n"
