@@ -1,5 +1,6 @@
 import logging
 import os
+from abc import ABC, abstractmethod
 from pathlib import Path
 from os.path import exists
 from appdirs import site_data_dir
@@ -69,6 +70,7 @@ class TrainSampleLog:
     def __init__(self, dirname: str):
         self.lock = RLock()
         self.__dirname = dirname
+        logging.info("using train file " + self.filename)
 
     @property
     def filename(self):
@@ -112,16 +114,14 @@ class TrainSampleLog:
         return "\n".join([sample.to_csv() for sample in self.all()])
 
 
+class Vectorizer(ABC):
 
-class Estimator:
+    @abstractmethod
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        pass
 
-    def __init__(self):
-        # it seems that the SVM approach produces good predictions
-        # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        kernel = 'poly'
-        self.clf = svm.SVC(kernel='rbf')
-        self.num_samples_last_train = 0
-        logging.info("using SVM kernel=" + kernel + " vectorizer=month,hour,irradiance")
+
+class BasicVectorizer(Vectorizer):
 
     def __scale(self, value: int, max_value: int, digits=0) -> float:
         if value == 0:
@@ -129,13 +129,25 @@ class Estimator:
         else:
             return round(value * 100 / max_value, digits)
 
-    def __vectorize(self, sample: WeatherForecast) -> List[float]:
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
         return [self.__scale(sample.time.month, 12),
                 self.__scale(sample.time.hour, 24),
-                #self.__scale(sample.sunshine, 10000),
-                #self.__scale(sample.probability_for_fog, 100),
-                #self.__scale(sample.visibility, 100000),
                 self.__scale(sample.irradiance, 1000)]
+
+    def __str__(self):
+        return "BasicVectorizer(month,hour,irradiance)"
+
+
+class Estimator:
+
+    def __init__(self):
+        # it seems that the SVM approach produces good predictions
+        # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
+        kernel = 'poly'
+        self.clf = svm.SVC(kernel=kernel)
+        self.__vectorizer = BasicVectorizer()
+        self.num_samples_last_train = 0
+        logging.info("using SVM kernel=" + kernel + " vectorizer=" + str(self.__vectorizer))
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
         samples = [sample for sample in samples if sample.irradiance > 0]
@@ -144,7 +156,7 @@ class Estimator:
             if num_samples < 2:
                 logging.warning("just " + str(len(samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
             else:
-                feature_vector_list = [self.__vectorize(sample) for sample in samples]
+                feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
                 label_list = [sample.power_watt for sample in samples]
                 if len(set(label_list)) > 1:
                     logging.info("retrain prediction model with " + str(num_samples) + " samples")
@@ -156,7 +168,7 @@ class Estimator:
     def predict(self, sample: WeatherForecast) -> Optional[int]:
         try:
             if sample.irradiance > 0:
-                feature_vector = self.__vectorize(sample)
+                feature_vector = self.__vectorizer.vectorize(sample)
                 #print(feature_vector)
                 predicted = self.clf.predict([feature_vector])[0]
                 return int(predicted)
@@ -208,7 +220,6 @@ class PvPowerForecast:
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
         self.__num_samples_last_retrain = 0
         self.__date_last_weather_forecast = datetime.now() - timedelta(days=1)
-        logging.info("using " + train_dir + " dir to store train data")
 
     def __retrain(self):
         try:
