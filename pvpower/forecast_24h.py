@@ -50,12 +50,18 @@ class TimeFrames:
         filtered_frames = [frame for frame in self.__frames if max(sorted(frame.hourly_power)) > min_watt_per_hour]
         return TimeFrames(filtered_frames)
 
-    def empty(self):
+    def empty(self) -> bool:
         return len(self.__frames) == 0
 
     def best(self) -> Optional[TimeFrame]:
         if len(self.__frames) > 0:
             return self.__frames[0]
+        else:
+            return None
+
+    def second_best(self) -> Optional[TimeFrame]:
+        if len(self.__frames) > 1:
+            return self.__frames[1]
         else:
             return None
 

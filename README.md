@@ -19,11 +19,11 @@ dwd_station_id = 'L160'
 pv_power_forecast = PvPowerForecast(dwd_station_id)
 ```
 
-**Self-learning**
+**Train with real measurements**
 
 It is essential that the PvPowerForecast library will be provided with real measured PV values of our PV system. 
-The provided real data is used as train data to adapt the internal model on your environment. 
-Providing additional technical parameters of your PV system such as installed power or cardinal direction is not required. This libray is self-learning. Technical parameters scuh as technical parameters of your PV system such as installed power or cardinal direction will be considered implicitly.
+The provided real data is used as train data to adapt the internal prediction model on your environment. 
+Providing additional technical parameters of your PV system such as installed power or cardinal direction is not required. This **libray is self-learning**.
 ```
 # please provide the real measured PV power value periodically. The period should be between 1 minute and 15 minutes.
 while True:
@@ -43,9 +43,9 @@ predicted_pv_power_watt_tomorrow = forecast.predict(tomorrow)
 
 **Energy management system support**
 
-The basic functionality of this library is to support photovoltaic power forecast. However, to maximize the yield of your PV system, 
-home appliances should operate only in periods when your PV system is delivering sufficient solar power.
-This is supported by the *Next24hours* convenience class shown below 
+The basic functionality of this library is to support photovoltaic power forecast. However, to maximize the yield 
+of your PV system, home appliances such as a dishwasher or laundry machines should operate only in periods when 
+your PV system is delivering sufficient solar power. To manage this, the *Next24hours* convenience class can be used as shown below 
 ```
 from pvpower.forecast import PvPowerForecast
 from pvpower.forecast_24h import Next24hours
@@ -59,7 +59,7 @@ peek_watt = next24h.peek()
 To start your home appliance such as a dishwasher at the right time you may query the available execution time frames. 
 In the example below the frames will be filtered considering the basic electricity consumption. Time frames will be considered only, 
 if the solar power is higher than the basic electricity consumption. In the example an average basic consumption of 350 watt is expected.
-Based on the resulting time frames the best one is used to start the home appliances in a delayed way.  
+Based on the resulting time frames the best one is used to start the home appliance in a delayed way.  
 ```
 ...
 pogram_duration_hour = 3

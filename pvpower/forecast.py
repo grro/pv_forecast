@@ -118,8 +118,10 @@ class Estimator:
     def __init__(self):
         # it seems that the SVM approach produces good predictions
         # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
+        kernel = 'poly'
         self.clf = svm.SVC(kernel='rbf')
         self.num_samples_last_train = 0
+        logging.info("using SVM kernel=" + kernel + " vectorizer=month,hour,irradiance")
 
     def __scale(self, value: int, max_value: int, digits=0) -> float:
         if value == 0:
