@@ -90,6 +90,9 @@ class Next24hours:
     def peek(self) -> int:
         return max(self.__prediction_values())
 
+    def power_total(self) -> int:
+        return sum(self.__prediction_values())
+
     def frames(self, width_hours: int = 1) -> TimeFrames:
         frames = []
         times = list(self.predictions.keys())
