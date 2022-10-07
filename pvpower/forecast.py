@@ -106,7 +106,22 @@ class TrainSampleLog:
                         return samples
                 except Exception as e:
                     logging.warning("error occurred loading " + self.filename + " " + str(e))
-            return []
+
+            plain_filename = self.filename[:-3]
+            if exists(plain_filename):
+                try:
+                    with open(plain_filename, "rb") as file:
+                        lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
+                        samples = []
+                        for line in lines:
+                            try:
+                                samples.append(LabelledWeatherForecast.from_csv(line))
+                            except Exception as e:
+                                pass
+                        return samples
+                except Exception as e:
+                    logging.warning("error occurred loading " + self.filename + " " + str(e))
+        return []
 
     def __str__(self):
         return "\n".join([sample.to_csv() for sample in self.all()])
@@ -156,8 +171,9 @@ class Estimator:
             else:
                 feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
                 label_list = [sample.power_watt for sample in samples]
+                times = sorted([sample.time for sample in samples])
                 if len(set(label_list)) > 1:
-                    logging.info("retrain prediction model with " + str(num_samples) + " samples")
+                    logging.info("retrain prediction model with " + str(num_samples) + " samples (period of time: " + str(int((times[-1] - times[0]).total_seconds() / (24*60*60))) + " days)")
                     self.clf.fit(feature_vector_list, label_list)
                     self.num_samples_last_train = num_samples
                 else:
