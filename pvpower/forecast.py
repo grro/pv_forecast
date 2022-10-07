@@ -75,23 +75,17 @@ class TrainSampleLog:
 
     @property
     def filename(self):
-        fn = os.path.join(self.__dirname, "train.csv")
+        fn = os.path.join(self.__dirname, "train.csv.gz")
         if not exists(fn):
-            dir = Path(fn).parent
-            if not exists(dir):
-                os.makedirs(dir)
+            directory = Path(fn).parent
+            if not exists(directory):
+                os.makedirs(directory)
         return fn
 
     def append(self, sample: LabelledWeatherForecast):
         with self.lock:
             exits = exists(self.filename)
-            with open(self.filename, "ab") as file:   #remove me
-                if not exits:
-                    file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
-                line = sample.to_csv() + "\n"
-                file.write(line.encode(encoding='UTF-8'))
-
-            with gzip.GzipFile(self.filename + ".gz", "ab") as file:
+            with gzip.GzipFile(self.filename, "ab") as file:
                 if not exits:
                     file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 line = sample.to_csv() + "\n"
@@ -99,11 +93,9 @@ class TrainSampleLog:
 
     def all(self) -> List[LabelledWeatherForecast]:
         with self.lock:
-            #if exists(self.__filename + ".json.gz"):
             if exists(self.filename):
                 try:
-                    #with gzip.GzipFile(self.__filename + ".json.gz", "rb") as file:
-                    with open(self.filename, "rb") as file:   # remove me
+                    with gzip.GzipFile(self.filename, "rb") as file:
                         lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
                         samples = []
                         for line in lines:
