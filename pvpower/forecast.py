@@ -1,6 +1,5 @@
 import logging
 import os
-import gzip
 from abc import ABC, abstractmethod
 from pathlib import Path
 from os.path import exists
@@ -75,7 +74,7 @@ class TrainSampleLog:
 
     @property
     def filename(self):
-        fn = os.path.join(self.__dirname, "train.csv.gz")
+        fn = os.path.join(self.__dirname, "train.csv")
         if not exists(fn):
             directory = Path(fn).parent
             if not exists(directory):
@@ -85,7 +84,7 @@ class TrainSampleLog:
     def append(self, sample: LabelledWeatherForecast):
         with self.lock:
             exits = exists(self.filename)
-            with gzip.GzipFile(self.filename, "ab") as file:
+            with open(self.filename, "ab") as file:
                 if not exits:
                     file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 line = sample.to_csv() + "\n"
@@ -95,22 +94,7 @@ class TrainSampleLog:
         with self.lock:
             if exists(self.filename):
                 try:
-                    with gzip.GzipFile(self.filename, "rb") as file:
-                        lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
-                        samples = []
-                        for line in lines:
-                            try:
-                                samples.append(LabelledWeatherForecast.from_csv(line))
-                            except Exception as e:
-                                pass
-                        return samples
-                except Exception as e:
-                    logging.warning("error occurred loading " + self.filename + " " + str(e))
-
-            plain_filename = self.filename[:-3]
-            if exists(plain_filename):
-                try:
-                    with open(plain_filename, "rb") as file:
+                    with open(self.filename, "rb") as file:
                         lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
                         samples = []
                         for line in lines:
