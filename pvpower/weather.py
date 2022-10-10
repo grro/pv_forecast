@@ -23,8 +23,9 @@ class WeatherForecast:
 
 class WeatherStation:
 
-    def __init__(self, station: str):
+    def __init__(self, station: str, refresh_period_min: int = 9):
         self.url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' + station + '/kml/MOSMIX_L_LATEST_K887.kmz'
+        self.__refresh_period_min = refresh_period_min
         self.__last_refresh = datetime.now() - timedelta(days=2)
         self.__global_irradiance = {}
         self.__sunshine = {}
@@ -41,7 +42,7 @@ class WeatherStation:
         return {WeatherStation.__datetime_to_string(time_steps[i]): int(float(values[i])) for i in range(0, len(time_steps))}
 
     def __refresh_data(self, force: bool = False):
-        if force or datetime.now() > self.__last_refresh + timedelta(minutes=15):
+        if force or datetime.now() > self.__last_refresh + timedelta(minutes=self.__refresh_period_min):
             response = requests.get(self.url, timeout=60)
             if 300 > response.status_code >= 200:
                 with ZipFile(BytesIO(response.content)) as my_zip_file:

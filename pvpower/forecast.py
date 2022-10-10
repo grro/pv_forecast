@@ -221,9 +221,8 @@ class PvPowerForecast:
 
     def __retrain(self):
         try:
-            minutes_since_last_retrain = int((datetime.now() - self.__date_last_retrain).total_seconds() / 60)
-            min_minutes = 60 if (self.__num_samples_last_retrain < (30 * 24)) else (7*24*60)  # with first month each hour else each week
-            if minutes_since_last_retrain > min_minutes:   # at maximum 1 train per day
+            min_minutes = 60 if (self.__num_samples_last_retrain < (30 * 24)) else (7*24*60)  # within first month each hour else each week
+            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=min_minutes)):
                 train_data = self.train_log.all()
                 self.__estimator.retrain(train_data)
                 self.__date_last_retrain = datetime.now()
