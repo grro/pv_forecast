@@ -90,6 +90,16 @@ class Next24hours:
     def peek(self) -> int:
         return max(self.__prediction_values())
 
+    def peek_time(self) -> datetime:
+        peek_time = None
+        peek_value = 0
+        for dt in self.predictions.keys():
+            forecast = self.predictions[dt]
+            if forecast.power_watt > peek_value:
+                peek_value = forecast.power_watt
+                peek_time = dt
+        return peek_time
+
     def power_total(self) -> int:
         return sum(self.__prediction_values())
 
