@@ -14,8 +14,10 @@ from pvpower.weather import WeatherStation, WeatherForecast
 
 
 
-def round_datetime(resolution_minutes: int, dt: datetime = datetime.now()) -> datetime:
-    rounded_minutes = int(dt.minute / resolution_minutes) * resolution_minutes
+def round_datetime(resolution_minutes: int, dt: datetime = None) -> datetime:
+    if dt is None:
+        dt = datetime.now()
+    rounded_minutes = round(dt.minute / resolution_minutes) * resolution_minutes
     return datetime.strptime(dt.strftime("%d.%m.%Y %H") + ":" + '{0:02d}'.format(rounded_minutes), "%d.%m.%Y %H:%M")
 
 
@@ -212,12 +214,14 @@ class ValueRecorder:
         else:
             return int(sum(self.__power_values) / len(self.__power_values))
 
-
+    def __str__(self):
+        return self.__start_time.strftime("%d.%m.%Y %H:%M") + " -> " + self.__end_time.strftime("%d.%m.%Y %H:%M") + "  average power " + str(self.average)
 
 
 class PvPowerForecast:
 
     def __init__(self, station_id: str, train_dir: str = None):
+        self.__lock = RLock()
         if train_dir is None:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
@@ -240,22 +244,25 @@ class PvPowerForecast:
             logging.warning("error occurred retrain prediction model " + str(e))
 
     def current_power_reading(self, real_power: int):
-        if self.__train_value_recorder.is_expired():
-            try:
-                if self.__train_value_recorder.average is not None:
-                    weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
-                    annotated_sample = LabelledWeatherForecast(self.__train_value_recorder.time,
-                                                               weather_sample.irradiance,
-                                                               weather_sample.sunshine,
-                                                               weather_sample.cloud_cover,
-                                                               weather_sample.probability_for_fog,
-                                                               weather_sample.visibility,
-                                                               self.__train_value_recorder.average)
-                    self.train_log.append(annotated_sample)
+        with self.__lock:
+            if self.__train_value_recorder.is_expired():
+                logging.info(str(self.__train_value_recorder) + " is expired. generated train data record")
+                try:
+                    if self.__train_value_recorder.average is not None:
+                        weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
+                        annotated_sample = LabelledWeatherForecast(self.__train_value_recorder.time,
+                                                                   weather_sample.irradiance,
+                                                                   weather_sample.sunshine,
+                                                                   weather_sample.cloud_cover,
+                                                                   weather_sample.probability_for_fog,
+                                                                   weather_sample.visibility,
+                                                                   self.__train_value_recorder.average)
+                        self.train_log.append(annotated_sample)
+                finally:
+                    self.__train_value_recorder = ValueRecorder()
+                    logging.info(" new value recorder " + str(self.__train_value_recorder))
                     self.__retrain()
-            finally:
-                self.__train_value_recorder = ValueRecorder()
-        self.__train_value_recorder.add(real_power)
+            self.__train_value_recorder.add(real_power)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         self.__retrain()

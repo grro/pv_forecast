@@ -25,7 +25,7 @@ It is essential that the PvPowerForecast library will be provided with real meas
 The provided real data is used as train data to adapt the internal prediction model on your environment. 
 Providing additional technical parameters of your PV system such as installed power or cardinal direction is not required. This **libray is self-learning**.
 ```
-# please provide the real measured PV power value periodically. The period should be between 1 minute and 15 minutes.
+# please provide the real measured PV power value periodically. The period should be between 1 minute and 10 minutes.
 while True:
     real_pv_power_watt = ...read real PV power ...
     pv_power_forecast.current_power_reading(real_pv_power_watt)
