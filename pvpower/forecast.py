@@ -163,7 +163,10 @@ class Estimator:
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
         seen = []
-        samples = list(filter(lambda sample: seen.append(sample) is None if sample not in seen else False, samples))
+ignore         num_samples = len(samples)
+        samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
+        if num_samples > len(samples):
+            logging.info(str(num_samples - len(samples)) + " duplicated samples removed")
         samples = [sample for sample in samples if sample.irradiance > 0]
         num_samples = len(samples)
         if self.num_samples_last_train != num_samples:
