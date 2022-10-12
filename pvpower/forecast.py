@@ -162,8 +162,8 @@ class Estimator:
         logging.info("using vectorizer=" + str(self.__vectorizer))
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
-        seen = []
-ignore         num_samples = len(samples)
+        seen = list()
+        num_samples = len(samples)
         samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
         if num_samples > len(samples):
             logging.info(str(num_samples - len(samples)) + " duplicated samples removed")
