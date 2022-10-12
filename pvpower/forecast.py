@@ -162,6 +162,8 @@ class Estimator:
         logging.info("using vectorizer=" + str(self.__vectorizer))
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
+        seen = []
+        samples = list(filter(lambda sample: seen.append(sample) is None if sample not in seen else False, samples))
         samples = [sample for sample in samples if sample.irradiance > 0]
         num_samples = len(samples)
         if self.num_samples_last_train != num_samples:
@@ -215,7 +217,7 @@ class ValueRecorder:
             return int(sum(self.__power_values) / len(self.__power_values))
 
     def __str__(self):
-        return self.__start_time.strftime("%d.%m.%Y %H:%M") + " -> " + self.__end_time.strftime("%d.%m.%Y %H:%M") + "  average power " + str(self.average)
+        return self.__start_time.strftime("%d.%m.%Y %H:%M") + " -> " + self.__end_time.strftime("%d.%m.%Y %H:%M") + "  average power: " + str(self.average) + " num probes: " + str(len(self.__power_values))
 
 
 class PvPowerForecast:
