@@ -13,6 +13,12 @@ from dataclasses import dataclass
 from pvpower.weather import WeatherStation, WeatherForecast
 
 
+
+def round_datetime(resolution_minutes: int, dt: datetime = datetime.now()) -> datetime:
+    rounded_minutes = int(dt.minute / resolution_minutes) * resolution_minutes
+    return datetime.strptime(dt.strftime("%d.%m.%Y %H") + ":" + '{0:02d}'.format(rounded_minutes), "%d.%m.%Y %H:%M")
+
+
 @dataclass(frozen=True)
 class LabelledWeatherForecast(WeatherForecast):
     power_watt: int
@@ -120,16 +126,18 @@ class Vectorizer(ABC):
 
 class BasicVectorizer(Vectorizer):
 
-    def __scale(self, value: int, max_value: int, digits=0) -> float:
+    def __scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
             return 0
         else:
             return round(value * 100 / max_value, digits)
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        return [self.__scale(sample.time.month, 12),
-                self.__scale(sample.time.hour, 24),
-                self.__scale(sample.irradiance, 1000)]
+        vectorized = [self.__scale(sample.time.month, 12),
+                      self.__scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
+                      self.__scale(sample.irradiance, 1000)]
+        #logging.info(sample.time.strftime("%d.%m.%Y %H:%M") + ";" + str(sample.irradiance) + "   ->   " + str(vectorized))
+        return vectorized
 
     def __str__(self):
         return "BasicVectorizer(month,hour,irradiance)"
@@ -137,14 +145,19 @@ class BasicVectorizer(Vectorizer):
 
 class Estimator:
 
-    def __init__(self):
+    def __init__(self, classifier= None, vectorizer: Vectorizer = None):
         # it seems that the SVM approach produces good predictions
         # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        kernel = 'poly'
-        self.clf = svm.SVC(kernel=kernel)
-        self.__vectorizer = BasicVectorizer()
+        if classifier is None:
+            self.__clf = svm.SVC(kernel='poly')
+        else:
+            self.__clf = classifier
+        if vectorizer is None:
+            self.__vectorizer = BasicVectorizer()
+        else:
+            self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
-        logging.info("using SVM kernel=" + kernel + " vectorizer=" + str(self.__vectorizer))
+        logging.info("using vectorizer=" + str(self.__vectorizer))
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
         samples = [sample for sample in samples if sample.irradiance > 0]
@@ -158,7 +171,7 @@ class Estimator:
                 times = sorted([sample.time for sample in samples])
                 if len(set(label_list)) > 1:
                     logging.info("retrain prediction model with " + str(num_samples) + " samples (period of time: " + str(int((times[-1] - times[0]).total_seconds() / (24*60*60))) + " days)")
-                    self.clf.fit(feature_vector_list, label_list)
+                    self.__clf.fit(feature_vector_list, label_list)
                     self.num_samples_last_train = num_samples
                 else:
                     logging.info("ignore retrain. Retrain requires more than " + str(len(set(label_list))) + " classes (samples " + str(num_samples) + ")")
@@ -168,7 +181,7 @@ class Estimator:
             if sample.irradiance > 0:
                 feature_vector = self.__vectorizer.vectorize(sample)
                 #print(feature_vector)
-                predicted = self.clf.predict([feature_vector])[0]
+                predicted = self.__clf.predict([feature_vector])[0]
                 return int(predicted)
             else:
                 return 0
@@ -179,30 +192,26 @@ class Estimator:
 
 class ValueRecorder:
 
-    def __init__(self):
-        self.__time = datetime.now()
-        self.__power_values_of_current_hour = []
+    def __init__(self, resolution_minutes: int = 10):
+        self.__resolution_minutes = resolution_minutes
+        self.__start_time = round_datetime(resolution_minutes=self.__resolution_minutes)
+        self.__end_time = self.__start_time + timedelta(minutes=self.__resolution_minutes)
+        self.time = self.__start_time + timedelta(minutes=round(self.__resolution_minutes/2))
+        self.__power_values = []
 
-    def same_hour(self, other_time: datetime):
-        return self.__time.strftime("%d.%m.%Y %H") == other_time.strftime("%d.%m.%Y %H")
+    def is_expired(self):
+        return datetime.now() > self.__end_time
 
-    @property
-    def time(self) -> datetime:
-        return datetime.strptime(self.__time.strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
+    def add(self, value: int):
+        self.__power_values.append(value)
 
     @property
     def average(self) -> Optional[int]:
-        if len(self.__power_values_of_current_hour) == 0:
+        if len(self.__power_values) == 0:
             return None
         else:
-            return int(sum(self.__power_values_of_current_hour) / len(self.__power_values_of_current_hour))
+            return int(sum(self.__power_values) / len(self.__power_values))
 
-    def add(self, value: int):
-        self.__power_values_of_current_hour.append(value)
-
-    def reset(self):
-        self.__time = datetime.now()
-        self.__power_values_of_current_hour = []
 
 
 
@@ -213,7 +222,7 @@ class PvPowerForecast:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
-        self.__train_data_value_recorder = ValueRecorder()
+        self.__train_value_recorder = ValueRecorder()
         self.__estimator = Estimator()
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
         self.__num_samples_last_retrain = 0
@@ -231,21 +240,22 @@ class PvPowerForecast:
             logging.warning("error occurred retrain prediction model " + str(e))
 
     def current_power_reading(self, real_power: int):
-        if self.__train_data_value_recorder.same_hour(datetime.now()):
-            self.__train_data_value_recorder.add(real_power)
-        else:
-            if self.__train_data_value_recorder.average is not None:
-                weather_sample = self.weather_forecast_service.forecast(self.__train_data_value_recorder.time)
-                annotated_sample = LabelledWeatherForecast(self.__train_data_value_recorder.time,
-                                                           weather_sample.irradiance,
-                                                           weather_sample.sunshine,
-                                                           weather_sample.cloud_cover,
-                                                           weather_sample.probability_for_fog,
-                                                           weather_sample.visibility,
-                                                           self.__train_data_value_recorder.average)
-                self.train_log.append(annotated_sample)
-                self.__retrain()
-            self.__train_data_value_recorder.reset()
+        if self.__train_value_recorder.is_expired():
+            try:
+                if self.__train_value_recorder.average is not None:
+                    weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
+                    annotated_sample = LabelledWeatherForecast(self.__train_value_recorder.time,
+                                                               weather_sample.irradiance,
+                                                               weather_sample.sunshine,
+                                                               weather_sample.cloud_cover,
+                                                               weather_sample.probability_for_fog,
+                                                               weather_sample.visibility,
+                                                               self.__train_value_recorder.average)
+                    self.train_log.append(annotated_sample)
+                    self.__retrain()
+            finally:
+                self.__train_value_recorder = ValueRecorder()
+        self.__train_value_recorder.add(real_power)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         self.__retrain()
