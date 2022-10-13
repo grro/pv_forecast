@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from sklearn import svm
 from typing import List
-from pvpower.weather import WeatherForecast
+from pvpower.weather_forecast import WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast
 
 

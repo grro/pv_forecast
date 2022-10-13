@@ -6,7 +6,7 @@ from threading import RLock
 from datetime import datetime
 from typing import List
 from dataclasses import dataclass
-from pvpower.weather import WeatherForecast
+from pvpower.weather_forecast import WeatherForecast
 
 
 
