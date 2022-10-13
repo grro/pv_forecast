@@ -4,7 +4,7 @@ from typing import Optional
 from sklearn import svm
 from typing import List
 from pvpower.weather import WeatherForecast
-from pvpower.train import LabelledWeatherForecast
+from pvpower.traindata import LabelledWeatherForecast
 
 
 

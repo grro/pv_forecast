@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from typing import List
 from pvpower.weather import WeatherStation, WeatherForecast
-from pvpower.train import LabelledWeatherForecast, TrainSampleLog
+from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
 from pvpower.estimator import Estimator
 
 
