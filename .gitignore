@@ -128,11 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /pvpower/example.py
-/pvpower/test.py
-/pvpower/test_device_control.py
+/pvpower/dev_test.py
+/pvpower/dev_test_device_control.py
 /pvpower/train.csv
 /pvpower/train_compare.py
 /requirements.txt
 /pv_forecast.iml
 /.idea/
 /pvpower/deleteme.py
+/pvpower/dev_train_tester.py

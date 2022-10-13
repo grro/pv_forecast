@@ -62,12 +62,12 @@ if the solar power is higher than the basic electricity consumption. In the exam
 Based on the resulting time frames the best one is used to start the home appliance in a delayed way.  
 ```
 ...
-pogram_duration_hour = 3
-best_frame = next24h.frames(width_hours=pogram_duration_hour).filter(min_watt_per_hour=350).best()
-if best_frame is None:
+pogram_duration_hours = 3
+best_time_frame = next24h.frames(width_hours=pogram_duration_hours).filter(min_watt_per_hour=350).best()
+if best_time_frame is None:
     #.. start now (no sufficient solar power next 24h)
 else:
     # .. start delayed when best window is reached
-    start_time = best_frame.start_time
+    start_time = best_time_frame.start_time
     ...
 ```

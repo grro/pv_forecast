@@ -1,16 +1,12 @@
 import logging
-import os
-from abc import ABC, abstractmethod
-from pathlib import Path
-from os.path import exists
 from appdirs import site_data_dir
 from threading import RLock
 from datetime import datetime, timedelta
 from typing import Optional
-from sklearn import svm
 from typing import List
-from dataclasses import dataclass
 from pvpower.weather import WeatherStation, WeatherForecast
+from pvpower.train import LabelledWeatherForecast, TrainSampleLog
+from pvpower.estimator import Estimator
 
 
 
@@ -21,180 +17,92 @@ def round_datetime(resolution_minutes: int, dt: datetime = None) -> datetime:
     return datetime.strptime(dt.strftime("%d.%m.%Y %H") + ":" + '{0:02d}'.format(rounded_minutes), "%d.%m.%Y %H:%M")
 
 
-@dataclass(frozen=True)
-class LabelledWeatherForecast(WeatherForecast):
-    power_watt: int
+class TestReport:
 
-    @staticmethod
-    def create(weather_forecast: WeatherForecast, power_watt: int):
-        return LabelledWeatherForecast(weather_forecast.time,
-                                       weather_forecast.irradiance,
-                                       weather_forecast.sunshine,
-                                       weather_forecast.cloud_cover,
-                                       weather_forecast.probability_for_fog,
-                                       weather_forecast.visibility,
-                                       power_watt)
+    def __init__(self, validation_samples: List[LabelledWeatherForecast], predictions: List[int]):
+        self.validation_samples = validation_samples
+        self.predictions = predictions
 
-    @staticmethod
-    def __to_string(value):
-        return "" if value is None else str(value)
-
-    def to_csv(self) -> str:
-        return self.time.strftime("%d.%m.%Y %H:%M") + ";" + \
-               LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
-               LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
-               LabelledWeatherForecast.__to_string(self.sunshine) + ";" + \
-               LabelledWeatherForecast.__to_string(self.cloud_cover) + ";" + \
-               LabelledWeatherForecast.__to_string(self.probability_for_fog) + ";" + \
-               LabelledWeatherForecast.__to_string(self.visibility)
-
-    @staticmethod
-    def csv_header() -> str:
-        return "time;real_pv_power;irradiance;sunshine;cloud_cover;probability_for_fog;visibility"
-
-    @staticmethod
-    def __to_int(txt):
-        if len(txt) > 0:
-            return int(float(txt))
-        else:
-            return None
-
-    @staticmethod
-    def from_csv(line: str):
-        parts = line.split(";")
-        time = datetime.strptime(parts[0], "%d.%m.%Y %H:%M")
-        real_pv_power = LabelledWeatherForecast.__to_int(parts[1])
-        irradiance = LabelledWeatherForecast.__to_int(parts[2])
-        sunshine = LabelledWeatherForecast.__to_int(parts[3])
-        cloud_cover_effective = LabelledWeatherForecast.__to_int(parts[4])
-        probability_for_fog = LabelledWeatherForecast.__to_int(parts[5])
-        visibility = LabelledWeatherForecast.__to_int(parts[6])
-        sample = LabelledWeatherForecast(time, irradiance, sunshine, cloud_cover_effective, probability_for_fog, visibility, real_pv_power)
-        return sample
-
-
-class TrainSampleLog:
-
-    def __init__(self, dirname: str):
-        self.lock = RLock()
-        self.__dirname = dirname
-        logging.info("using train file " + self.filename)
-
-    @property
-    def filename(self):
-        fn = os.path.join(self.__dirname, "train.csv")
-        if not exists(fn):
-            directory = Path(fn).parent
-            if not exists(directory):
-                os.makedirs(directory)
-        return fn
-
-    def append(self, sample: LabelledWeatherForecast):
-        with self.lock:
-            exits = exists(self.filename)
-            with open(self.filename, "ab") as file:
-                if not exits:
-                    file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
-                line = sample.to_csv() + "\n"
-                file.write(line.encode(encoding='UTF-8'))
-
-    def all(self) -> List[LabelledWeatherForecast]:
-        with self.lock:
-            if exists(self.filename):
-                try:
-                    with open(self.filename, "rb") as file:
-                        lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
-                        samples = []
-                        for line in lines:
-                            try:
-                                samples.append(LabelledWeatherForecast.from_csv(line))
-                            except Exception as e:
-                                pass
-                        return samples
-                except Exception as e:
-                    logging.warning("error occurred loading " + self.filename + " " + str(e))
-        return []
-
-    def __str__(self):
-        return "\n".join([sample.to_csv() for sample in self.all()])
-
-
-class Vectorizer(ABC):
-
-    @abstractmethod
-    def vectorize(self, sample: WeatherForecast) -> List[float]:
-        pass
-
-
-class BasicVectorizer(Vectorizer):
-
-    def __scale(self, value: int, max_value: int, digits=1) -> float:
-        if value == 0:
+    def __percent(self, real, predicted):
+        if real == 0:
+            return 0
+        elif predicted == 0:
             return 0
         else:
-            return round(value * 100 / max_value, digits)
+            return round((predicted * 100 / real) - 100, 2)
 
-    def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self.__scale(sample.time.month, 12),
-                      self.__scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
-                      self.__scale(sample.irradiance, 1000)]
-        #logging.info(sample.time.strftime("%d.%m.%Y %H:%M") + ";" + str(sample.irradiance) + "   ->   " + str(vectorized))
-        return vectorized
+    def __diff_all(self) -> List[float]:
+        diff_total = []
+        for i in range(len(self.validation_samples)):
+            if self.validation_samples[i].irradiance == 0:
+                continue
+            else:
+                predicted = self.predictions[i]
+
+            real = self.validation_samples[i].power_watt
+            if real == 0:
+                if predicted == 0:     # ignore true 0 predictions to void wasting the score
+                    diff = 0
+                else:
+                    diff = 100
+            else:
+                if real < 10 and abs(predicted - real) < 10:  # ignore diff < 10
+                    diff = 0
+                else:
+                    diff = self.__percent(real, predicted)
+            diff_total.append(diff)
+        return sorted(diff_total)
+
+    @property
+    def score(self) -> float:
+        values = sorted(list(self.__diff_all()))
+        values = values[2:-2]
+        abs_values = [abs(value) for value in values]
+        return round(sum(abs_values) / len(abs_values), 2)
+
+    def __repr__(self):
+        return self.__str__()
 
     def __str__(self):
-        return "BasicVectorizer(month,hour,irradiance)"
+        txt = "score:  " + str(self.score) + "\n"
+        txt += '{:14s}        {:14s} {:14s} {:14s} {:14s} {:14s}         {:10s} {:10s}           {:10s}\n'.format("time", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog", "real", "predicted", "diff[%]")
+        for i in range(0, len(self.validation_samples)):
+            txt += '{:<14s}        {:<14d} {:<14d} {:<14d} {:<14d}  {:<14d}        {:<10d} {:<10d}           {:<10d}\n'.format(self.validation_samples[i].time.strftime("%d.%b  %H:%S"),
+                                                                                                                               self.validation_samples[i].irradiance,
+                                                                                                                               self.validation_samples[i].sunshine,
+                                                                                                                               self.validation_samples[i].cloud_cover,
+                                                                                                                               self.validation_samples[i].visibility,
+                                                                                                                               self.validation_samples[i].probability_for_fog,
+                                                                                                                               self.validation_samples[i].power_watt,
+                                                                                                                               self.predictions[i],
+                                                                                                                               int(self.__percent(self.validation_samples[i].power_watt, self.predictions[i])))
+        return txt
 
 
-class Estimator:
+class Tester:
 
-    def __init__(self, classifier= None, vectorizer: Vectorizer = None):
-        # it seems that the SVM approach produces good predictions
-        # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        if classifier is None:
-            self.__clf = svm.SVC(kernel='poly')
-        else:
-            self.__clf = classifier
-        if vectorizer is None:
-            self.__vectorizer = BasicVectorizer()
-        else:
-            self.__vectorizer = vectorizer
-        self.num_samples_last_train = 0
-        logging.info("using vectorizer=" + str(self.__vectorizer))
+    def __init__(self, samples: List[LabelledWeatherForecast]):
+        self.__samples = samples
 
-    def retrain(self, samples: List[LabelledWeatherForecast]):
-        seen = list()
-        num_samples = len(samples)
-        samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
-        if num_samples > len(samples):
-            logging.info(str(num_samples - len(samples)) + " duplicated samples removed")
-        samples = [sample for sample in samples if sample.irradiance > 0]
-        num_samples = len(samples)
-        if self.num_samples_last_train != num_samples:
-            if num_samples < 2:
-                logging.warning("just " + str(len(samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
-            else:
-                feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
-                label_list = [sample.power_watt for sample in samples]
-                times = sorted([sample.time for sample in samples])
-                if len(set(label_list)) > 1:
-                    logging.info("retrain prediction model with " + str(num_samples) + " samples (period of time: " + str(int((times[-1] - times[0]).total_seconds() / (24*60*60))) + " days)")
-                    self.__clf.fit(feature_vector_list, label_list)
-                    self.num_samples_last_train = num_samples
-                else:
-                    logging.info("ignore retrain. Retrain requires more than " + str(len(set(label_list))) + " classes (samples " + str(num_samples) + ")")
+    def evaluate(self, estimator: Estimator) -> List[TestReport]:
+        test_reports = []
+        samples = estimator.clean_data(self.__samples)
+        logging.info("testing with " + str(len(samples)) + " samples")
+        for i in range(0, len(samples)):
+            # split test data
+            num_train_samples = int(len(samples) * 0.7)
+            train_samples = samples[0: num_train_samples]
+            validation_samples = samples[num_train_samples:]
 
-    def predict(self, sample: WeatherForecast) -> Optional[int]:
-        try:
-            if sample.irradiance > 0:
-                feature_vector = self.__vectorizer.vectorize(sample)
-                #print(feature_vector)
-                predicted = self.__clf.predict([feature_vector])[0]
-                return int(predicted)
-            else:
-                return 0
-        except Exception as e:
-            logging.warning("error occurred predicting " + str(sample) + " " + str(e))
-            return None
+            # train and test
+            estimator.retrain(train_samples)
+            predicted = [estimator.predict(test_sample) for test_sample in validation_samples]
+            test_reports.append(TestReport(validation_samples, predicted))
+
+            samples = samples[-1:] + samples[:-1]
+
+        test_reports.sort(key=lambda report: report.score)
+        return test_reports
 
 
 class ValueRecorder:
@@ -237,14 +145,26 @@ class PvPowerForecast:
         self.__num_samples_last_retrain = 0
         self.__date_last_weather_forecast = datetime.now() - timedelta(days=1)
 
+    @property
+    def __max_retrain_period_minutes(self) -> int:
+        if self.__num_samples_last_retrain < 1000:
+            return 60       # 1 hour
+        else:
+            return 7*24*60  # 1 week
+
     def __retrain(self):
         try:
-            min_minutes = 60 if (self.__num_samples_last_retrain < (30 * 24)) else (7*24*60)  # within first month each hour else each week
-            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=min_minutes)):
-                train_data = self.train_log.all()
-                self.__estimator.retrain(train_data)
+            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=self.__max_retrain_period_minutes)):
+                samples = self.train_log.all()
+                self.__estimator.retrain(samples)
                 self.__date_last_retrain = datetime.now()
-                self.__num_samples_last_retrain = len(train_data)
+                self.__num_samples_last_retrain = len(samples)
+                if len(samples) < 1000:
+                    test_reports = Tester(samples).evaluate(self.__estimator)
+                    logging.info("prediction model retrained (median deviation: " + str(round(test_reports[int(len(test_reports)*0.5)].score, 1)) + "% -> smaller is better)")
+                else:
+                    logging.info("prediction model retrained")
+
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
