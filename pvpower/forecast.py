@@ -144,6 +144,7 @@ class PvPowerForecast:
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
         self.__num_samples_last_retrain = 0
         self.__date_last_weather_forecast = datetime.now() - timedelta(days=1)
+        self.__retrain("on initializing")
 
     @property
     def __max_retrain_period_minutes(self) -> int:
@@ -152,7 +153,7 @@ class PvPowerForecast:
         else:
             return 7*24*60  # 1 week
 
-    def __retrain(self):
+    def __retrain(self, reason: str):
         try:
             if datetime.now() > (self.__date_last_retrain + timedelta(minutes=self.__max_retrain_period_minutes)):
                 samples = self.train_log.all()
@@ -161,9 +162,9 @@ class PvPowerForecast:
                 self.__num_samples_last_retrain = len(samples)
                 if len(samples) < 1000:
                     test_reports = Tester(samples).evaluate(self.__estimator)
-                    logging.info("prediction model retrained (median deviation: " + str(round(test_reports[int(len(test_reports)*0.5)].score, 1)) + "% -> smaller is better)")
+                    logging.info("prediction model retrained " + reason + " (median deviation: " + str(round(test_reports[int(len(test_reports)*0.5)].score, 1)) + "% -> smaller is better)")
                 else:
-                    logging.info("prediction model retrained")
+                    logging.info("prediction model retrained " + reason)
 
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
@@ -186,11 +187,10 @@ class PvPowerForecast:
                 finally:
                     self.__train_value_recorder = ValueRecorder()
                     logging.info(" new value recorder " + str(self.__train_value_recorder))
-                    self.__retrain()
+                    self.__retrain("on updated train data")
             self.__train_value_recorder.add(real_power)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
-        self.__retrain()
         return self.__estimator.predict(sample)
 
     def predict(self, time: datetime) -> Optional[int]:
