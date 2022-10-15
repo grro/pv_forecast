@@ -47,34 +47,29 @@ class Estimator:
             self.__vectorizer = BasicVectorizer()
         else:
             self.__vectorizer = vectorizer
-        self.num_samples_last_train = 0
-        logging.info("using vectorizer=" + str(self.__vectorizer))
+        self.__num_samples_last_train = 0
 
     def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
-        num_samples = len(samples)
         samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
-        if num_samples > len(samples):
-            logging.info(str(num_samples - len(samples)) + " duplicated samples removed")
         samples = [sample for sample in samples if sample.irradiance > 0]
         return samples
 
     def retrain(self, samples: List[LabelledWeatherForecast]):
-        samples = self.clean_data(samples)
-        num_samples = len(samples)
-        if self.num_samples_last_train != num_samples:
+        cleaned_samples = self.clean_data(samples)
+        num_samples = len(cleaned_samples)
+        if self.__num_samples_last_train != num_samples:
             if num_samples < 2:
-                logging.warning("just " + str(len(samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
+                logging.warning("just " + str(len(cleaned_samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
             else:
-                feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
-                label_list = [sample.power_watt for sample in samples]
-                times = sorted([sample.time for sample in samples])
+                feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in cleaned_samples]
+                label_list = [sample.power_watt for sample in cleaned_samples]
                 if len(set(label_list)) > 1:
-                    logging.info("retrain prediction model with " + str(num_samples) + " samples (period of time: " + str(int((times[-1] - times[0]).total_seconds() / (24*60*60))) + " days)")
                     self.__clf.fit(feature_vector_list, label_list)
-                    self.num_samples_last_train = num_samples
-                else:
-                    logging.info("ignore retrain. Retrain requires more than " + str(len(set(label_list))) + " classes (samples " + str(num_samples) + ")")
+                    self.__num_samples_last_train = num_samples
+
+    def __str__(self):
+        return "Model vectorizer=" + str(self.__vectorizer) + " trained with " + str(self.__num_samples_last_train) + " cleaned samples"
 
     def predict(self, sample: WeatherForecast) -> Optional[int]:
         try:
