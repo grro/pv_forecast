@@ -186,7 +186,6 @@ class PvPowerForecast:
                         self.train_log.append(annotated_sample)
                 finally:
                     self.__train_value_recorder = ValueRecorder()
-                    logging.info(" new value recorder " + str(self.__train_value_recorder))
                     self.__retrain("on updated train data")
             self.__train_value_recorder.add(real_power)
 

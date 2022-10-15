@@ -86,6 +86,7 @@ class TrainSampleLog:
                     file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
+                logging.info("record appended to train file " + self.filename)
 
     def all(self) -> List[LabelledWeatherForecast]:
         with self.lock:
