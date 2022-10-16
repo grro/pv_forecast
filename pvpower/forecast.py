@@ -1,5 +1,6 @@
 import logging
 from appdirs import site_data_dir
+from threading import Thread
 from datetime import datetime, timedelta
 from typing import Optional
 from typing import List
@@ -145,7 +146,7 @@ class PvPowerForecast:
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
         self.__num_samples_last_retrain = 0
         self.__date_last_weather_forecast = datetime.now() - timedelta(days=1)
-        self.__retrain("on initializing")
+        self.__retrain()
 
     @property
     def __max_retrain_period_minutes(self) -> int:
@@ -154,14 +155,14 @@ class PvPowerForecast:
         else:
             return 7*24*60  # 1 week
 
-    def __retrain(self, reason: str):
+    def __retrain(self):
         try:
             if datetime.now() > (self.__date_last_retrain + timedelta(minutes=self.__max_retrain_period_minutes)):
                 samples = self.train_log.all()
                 self.__estimator.retrain(samples)
                 self.__date_last_retrain = datetime.now()
                 self.__num_samples_last_retrain = len(samples)
-                logging.info("prediction model (" + str(self.__estimator) + ") retrained " + reason)
+                logging.info("prediction model retrained: " + str(self.__estimator))
 
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
@@ -181,7 +182,7 @@ class PvPowerForecast:
                     self.train_log.append(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()
-            self.__retrain("on updated train data")
+            Thread(target=self.__retrain, daemon=True).start()
         self.__train_value_recorder.add(real_power)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:

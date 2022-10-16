@@ -137,3 +137,4 @@ dmypy.json
 /.idea/
 /pvpower/deleteme.py
 /pvpower/dev_train_tester.py
+/pvpower/test_kmz.py
