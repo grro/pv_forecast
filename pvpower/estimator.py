@@ -28,7 +28,8 @@ class BasicVectorizer(Vectorizer):
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time.month, 12),
                       self._scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
-                      self._scale(sample.irradiance, 1000)]
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.visibility, 50000)]
         #logging.info(sample.time.strftime("%d.%m.%Y %H:%M") + ";" + str(sample.irradiance) + "   ->   " + str(vectorized))
         return vectorized
 
