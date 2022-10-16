@@ -1,4 +1,6 @@
 import logging
+import time
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 from sklearn import svm
@@ -14,24 +16,30 @@ class Vectorizer(ABC):
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         pass
 
-
-class BasicVectorizer(Vectorizer):
-
-    def __scale(self, value: int, max_value: int, digits=1) -> float:
+    def _scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
             return 0
         else:
             return round(value * 100 / max_value, digits)
 
+
+class BasicVectorizer(Vectorizer):
+
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self.__scale(sample.time.month, 12),
-                      self.__scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
-                      self.__scale(sample.irradiance, 1000)]
+        vectorized = [self._scale(sample.time.month, 12),
+                      self._scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
+                      self._scale(sample.irradiance, 1000)]
         #logging.info(sample.time.strftime("%d.%m.%Y %H:%M") + ";" + str(sample.irradiance) + "   ->   " + str(vectorized))
         return vectorized
 
     def __str__(self):
         return "BasicVectorizer(month,hour,irradiance)"
+
+
+@dataclass(frozen=True)
+class TrainReport:
+    samples: List[LabelledWeatherForecast]
+
 
 
 class Estimator:
@@ -55,7 +63,7 @@ class Estimator:
         samples = [sample for sample in samples if sample.irradiance > 0]
         return samples
 
-    def retrain(self, samples: List[LabelledWeatherForecast]):
+    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
         cleaned_samples = self.clean_data(samples)
         num_samples = len(cleaned_samples)
         if self.__num_samples_last_train != num_samples:
@@ -67,6 +75,7 @@ class Estimator:
                 if len(set(label_list)) > 1:
                     self.__clf.fit(feature_vector_list, label_list)
                     self.__num_samples_last_train = num_samples
+        return TrainReport(cleaned_samples)
 
     def __str__(self):
         return "Model vectorizer=" + str(self.__vectorizer) + " trained with " + str(self.__num_samples_last_train) + " cleaned samples"

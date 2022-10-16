@@ -67,7 +67,7 @@ class TrainSampleLog:
     def __init__(self, dirname: str):
         self.lock = RLock()
         self.__dirname = dirname
-        logging.info("using train file " + self.filename)
+        #logging.info("using train file " + self.filename)
 
     @property
     def filename(self):
@@ -86,7 +86,6 @@ class TrainSampleLog:
                     file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
-                logging.info("record sample to train file " + self.filename)
 
     def all(self) -> List[LabelledWeatherForecast]:
         with self.lock:
@@ -100,7 +99,6 @@ class TrainSampleLog:
                                 samples.append(LabelledWeatherForecast.from_csv(line))
                             except Exception as e:
                                 pass
-                        logging.info(str(len(samples)) + " samples loaded from train file " + self.filename)
                         return samples
                 except Exception as e:
                     logging.warning("error occurred loading " + self.filename + " " + str(e))

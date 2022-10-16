@@ -1,12 +1,11 @@
 import logging
 from appdirs import site_data_dir
-from threading import RLock
 from datetime import datetime, timedelta
 from typing import Optional
 from typing import List
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
-from pvpower.estimator import Estimator
+from pvpower.estimator import Estimator, TrainReport
 
 
 
@@ -14,12 +13,14 @@ def round_datetime(resolution_minutes: int, dt: datetime = None) -> datetime:
     if dt is None:
         dt = datetime.now()
     rounded_minutes = round(dt.minute / resolution_minutes) * resolution_minutes
-    return datetime.strptime(dt.strftime("%d.%m.%Y %H") + ":" + '{0:02d}'.format(rounded_minutes), "%d.%m.%Y %H:%M")
+    time_string = dt.strftime("%d.%m.%Y %H")
+    return datetime.strptime(time_string + ":" + '{0:02d}'.format(rounded_minutes), "%d.%m.%Y %H:%M")
 
 
 class TestReport:
 
-    def __init__(self, validation_samples: List[LabelledWeatherForecast], predictions: List[int]):
+    def __init__(self, train_report: TrainReport, validation_samples: List[LabelledWeatherForecast], predictions: List[int]):
+        self.train_report = train_report
         self.validation_samples = validation_samples
         self.predictions = predictions
 
@@ -64,7 +65,7 @@ class TestReport:
         return self.__str__()
 
     def __str__(self):
-        txt = "score:  " + str(self.score) + "\n"
+        txt = "score:  " + str(self.score) + " (samples: " + str(len(self.train_report.samples)) + ", took: " + str(round(self.train_report.elapsed_sec, 1)) + " sec)\n"
         txt += '{:14s}        {:14s} {:14s} {:14s} {:14s} {:14s}         {:10s} {:10s}           {:10s}\n'.format("time", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog", "real", "predicted", "diff[%]")
         for i in range(0, len(self.validation_samples)):
             txt += '{:<14s}        {:<14d} {:<14d} {:<14d} {:<14d}  {:<14d}        {:<10d} {:<10d}           {:<10d}\n'.format(self.validation_samples[i].time.strftime("%d.%b  %H:%S"),
@@ -76,6 +77,7 @@ class TestReport:
                                                                                                                                self.validation_samples[i].power_watt,
                                                                                                                                self.predictions[i],
                                                                                                                                int(self.__percent(self.validation_samples[i].power_watt, self.predictions[i])))
+        txt = txt + "\nscore:  " + str(self.score)
         return txt
 
 
@@ -94,9 +96,9 @@ class Tester:
             validation_samples = samples[num_train_samples:]
 
             # train and test
-            estimator.retrain(train_samples)
+            train_report = estimator.retrain(train_samples)
             predicted = [estimator.predict(test_sample) for test_sample in validation_samples]
-            test_reports.append(TestReport(validation_samples, predicted))
+            test_reports.append(TestReport(train_report, validation_samples, predicted))
 
             samples = samples[-1:] + samples[:-1]
 
@@ -137,6 +139,7 @@ class PvPowerForecast:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
+        logging.info("train log " + self.train_log.filename)
         self.__train_value_recorder = ValueRecorder()
         self.__estimator = Estimator()
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
@@ -165,7 +168,6 @@ class PvPowerForecast:
 
     def current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
-            logging.info(str(self.__train_value_recorder) + " is expired. generated train data record")
             try:
                 if self.__train_value_recorder.average is not None:
                     weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
