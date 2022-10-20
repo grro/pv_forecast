@@ -118,8 +118,8 @@ class MosmixS:
     def content_age_sec(self) -> int:
         return int((datetime.now() - self.issue_time()).total_seconds())
 
-    def is_expired(self):
-        return self.content_age_sec() > 60 and (datetime.now() - self.__fetch_datetime).total_seconds() > (7 * 60)
+    def elapsed_sec_fetched(self):
+        return int((datetime.now() - self.__fetch_datetime).total_seconds())
 
     def rad1h(self, dt: datetime) -> float:
         if self.__rad1h_series is None:
@@ -162,7 +162,7 @@ class MosmixS:
 
     @staticmethod
     def load(station_id: str, url: str = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'):
-        logging.info("loading MOSMIX_S")
+        logging.debug("loading MOSMIX_S")
         mosmix = MosmixS(station_id)
         xml_parser = ET.XMLPullParser(['start', 'end'])
         for file_name, file_size, unzipped_chunks in stream_unzip(MosmixS.__perform_get_chunked(url)):
