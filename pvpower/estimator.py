@@ -1,4 +1,5 @@
 import logging
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -39,7 +40,7 @@ class BasicVectorizer(Vectorizer):
                       self._scale(int(self._minutes_of_day(sample.time)/window_minutes), int((24*60)/window_minutes)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000)]
-        #logging.debug(sample.time.strftime("%b %H:%M") + ";irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
+        logging.debug(sample.time.strftime("%b %H:%M") + ";irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
         return vectorized
 
     def __str__(self):
@@ -101,4 +102,5 @@ class Estimator:
                 return 0
         except Exception as e:
             logging.warning("error occurred predicting " + str(sample) + " " + str(e))
+            logging.warning(traceback.format_exc())
             return None
