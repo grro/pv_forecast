@@ -1,6 +1,6 @@
 import logging
-import time
 from dataclasses import dataclass
+from datetime import datetime
 from abc import ABC, abstractmethod
 from typing import Optional
 from sklearn import svm
@@ -10,11 +10,15 @@ from pvpower.traindata import LabelledWeatherForecast
 
 
 
+
+
 class Vectorizer(ABC):
 
-    @abstractmethod
-    def vectorize(self, sample: WeatherForecast) -> List[float]:
-        pass
+    def __init__(self, datetime_resolution_minutes: int = 15):
+        self._datetime_resolution_minutes = datetime_resolution_minutes
+
+    def _minutes_of_day(self, dt: datetime) -> int:
+        return (dt.hour * 60) + dt.minute
 
     def _scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
@@ -22,15 +26,20 @@ class Vectorizer(ABC):
         else:
             return round(value * 100 / max_value, digits)
 
+    @abstractmethod
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        pass
+
 
 class BasicVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
+        window_minutes = 15
         vectorized = [self._scale(sample.time.month, 12),
-                      self._scale((sample.time.hour*60) + (int(sample.time.minute/15) * 15), 24*60),
+                      self._scale(int(self._minutes_of_day(sample.time)/window_minutes), int((24*60)/window_minutes)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000)]
-        #logging.info(sample.time.strftime("%d.%m.%Y %H:%M") + ";" + str(sample.irradiance) + "   ->   " + str(vectorized))
+        logging.info(sample.time.strftime("%b %H:%M") + ";irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
         return vectorized
 
     def __str__(self):
@@ -62,6 +71,7 @@ class Estimator:
         seen = list()
         samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
         samples = [sample for sample in samples if sample.irradiance > 0]
+        samples = [sample for sample in samples if sample.sunshine is not None and sample.visibility is not None]
         return samples
 
     def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
@@ -85,7 +95,6 @@ class Estimator:
         try:
             if sample.irradiance > 0:
                 feature_vector = self.__vectorizer.vectorize(sample)
-                #print(feature_vector)
                 predicted = self.__clf.predict([feature_vector])[0]
                 return int(predicted)
             else:

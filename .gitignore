@@ -138,3 +138,6 @@ dmypy.json
 /pvpower/deleteme.py
 /pvpower/dev_train_tester.py
 /pvpower/test_kmz.py
+/pvpower/weather_forecast2.py
+/pvpower/dev_mosmix.py
+/pvpower/weather_forecast_old.py

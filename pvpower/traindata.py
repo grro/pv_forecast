@@ -15,8 +15,8 @@ class LabelledWeatherForecast(WeatherForecast):
     power_watt: int
 
     @staticmethod
-    def create(weather_forecast: WeatherForecast, power_watt: int):
-        return LabelledWeatherForecast(weather_forecast.time,
+    def create(weather_forecast: WeatherForecast, power_watt: int, time: datetime = None):
+        return LabelledWeatherForecast(weather_forecast.time if time is None else time,
                                        weather_forecast.irradiance,
                                        weather_forecast.sunshine,
                                        weather_forecast.cloud_cover,

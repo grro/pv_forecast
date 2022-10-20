@@ -117,7 +117,9 @@ class Next24hours:
         txt = ""
         for time in list(self.predictions.keys())[:24]:
             txt += time.strftime("%d.%m %H:%M") + ": " + str(self.predictions[time].power_watt) +\
-                   "  (irradiance=" + str(self.predictions[time].irradiance) + ", cloud_cover=" + str(self.predictions[time].cloud_cover) + ")\n"
+                   "  (irradiance=" + str(self.predictions[time].irradiance) + \
+                   ", visibility=" + str(self.predictions[time].visibility) + \
+                   ", cloud_cover=" + str(self.predictions[time].cloud_cover) + ")\n"
         return txt
 
 
