@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
-from pvpower.estimator import Estimator
-
+from pvpower.estimator import Estimator, TrainReport
 
 
 class ValueRecorder:
@@ -41,30 +40,18 @@ class PvPowerForecast:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
-        logging.info("train log " + self.train_log.filename())
         self.__train_value_recorder = ValueRecorder()
         self.__estimator = Estimator()
-        self.__date_last_retrain = datetime.now() - timedelta(days=90)
-        self.__num_samples_last_retrain = 0
-        self.__date_last_weather_forecast = datetime.now() - timedelta(days=1)
+        self.__date_last_retrain = datetime.now()
         self.__retrain()
 
-    @property
-    def __max_retrain_period_minutes(self) -> int:
-        if self.__num_samples_last_retrain < 1000:
-            return 60       # 1 hour
-        else:
-            return 7*24*60  # 1 week
-
-    def __retrain(self):
+    def __retrain(self) -> TrainReport:
         try:
-            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=self.__max_retrain_period_minutes)):
-                samples = self.train_log.all()
-                self.__estimator.retrain(samples)
-                self.__date_last_retrain = datetime.now()
-                self.__num_samples_last_retrain = len(samples)
-                logging.info("prediction model retrained: " + str(self.__estimator))
-
+            logging.info("retrain with train log " + self.train_log.filename())
+            samples = self.train_log.all()
+            train_report = self.__estimator.retrain(samples)
+            logging.info("prediction model retrained: " + str(self.__estimator))
+            return train_report
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
@@ -77,11 +64,20 @@ class PvPowerForecast:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
                                                                           self.__train_value_recorder.average,
                                                                           time=self.__train_value_recorder.time)
-                        self.train_log.append(annotated_sample)
+                        self.__on_new_train_sample(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()
-            Thread(target=self.__retrain, daemon=True).start()
         self.__train_value_recorder.add(real_power)
+
+    def __on_new_train_sample(self, annotated_sample: LabelledWeatherForecast):
+        # add to train log db
+        self.train_log.append(annotated_sample)
+
+        # retrain, if necessary
+        max_retrain_period = 60 if (self.__estimator.num_samples_last_train < 5000) else 30*24*60  # 1 day or 1 month
+        if datetime.now() > (self.__date_last_retrain + timedelta(minutes=max_retrain_period)):
+            self.__date_last_retrain = datetime.now()
+            Thread(target=self.__retrain, daemon=True).start()
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         return self.__estimator.predict(sample)

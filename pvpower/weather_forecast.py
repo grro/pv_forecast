@@ -62,7 +62,6 @@ class WeatherStation:
         if self.__mosmixs.supports(time):
             mosmixs = self.__mosmixs
         elif self.__previous_mosmixs.supports(time):
-            logging.info("fallback")
             mosmixs = self.__previous_mosmixs
         else:
             return None
@@ -76,6 +75,6 @@ class WeatherStation:
         if forecast.is_valid():
             return forecast
         else:
-            logging.info("weather sample is incomplete. Returning None " + str(forecast))
+            logging.info("available weather sample is incomplete. Returning None " + str(forecast))
             return None
 

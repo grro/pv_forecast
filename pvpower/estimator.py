@@ -1,5 +1,4 @@
 import logging
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -8,8 +7,6 @@ from sklearn import svm
 from typing import List
 from pvpower.weather_forecast import WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast
-
-
 
 
 
@@ -32,7 +29,7 @@ class Vectorizer(ABC):
         pass
 
 
-class BasicVectorizer(Vectorizer):
+class SimpleVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         window_minutes = 15
@@ -44,7 +41,8 @@ class BasicVectorizer(Vectorizer):
         return vectorized
 
     def __str__(self):
-        return "BasicVectorizer(month,hour,irradiance)"
+        return "SimpleVectorizer(month,fifteenthMinuteOfDay,irradiance,visibility)"
+
 
 
 @dataclass(frozen=True)
@@ -63,10 +61,10 @@ class Estimator:
         else:
             self.__clf = classifier
         if vectorizer is None:
-            self.__vectorizer = BasicVectorizer()
+            self.__vectorizer = SimpleVectorizer()
         else:
             self.__vectorizer = vectorizer
-        self.__num_samples_last_train = 0
+        self.num_samples_last_train = 0
 
     def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
@@ -78,7 +76,7 @@ class Estimator:
     def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
         cleaned_samples = self.clean_data(samples)
         num_samples = len(cleaned_samples)
-        if self.__num_samples_last_train != num_samples:
+        if self.num_samples_last_train != num_samples:
             if num_samples < 2:
                 logging.warning("just " + str(len(cleaned_samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
             else:
@@ -101,6 +99,5 @@ class Estimator:
             else:
                 return 0
         except Exception as e:
-            logging.warning("error occurred predicting " + str(sample) + " " + str(e))
-            logging.warning(traceback.format_exc())
+            logging.warning("error occurred predicting " + str(sample), e)
             return None
