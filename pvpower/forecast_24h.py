@@ -79,9 +79,10 @@ class Next24hours:
         now = datetime.strptime((datetime.now()).strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
         predictions = {}
         for weather_forecast in [pv_forecast.weather_forecast_service.forecast(prediction_time) for prediction_time in [now + timedelta(hours=i) for i in range(0, 40)]]:
-            predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
-            if predicted_value is not None:
-                predictions[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
+            if weather_forecast is not None:
+                predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
+                if predicted_value is not None:
+                    predictions[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
         return Next24hours(predictions)
 
     def __prediction_values(self) -> List[int]:
@@ -119,6 +120,7 @@ class Next24hours:
             txt += time.strftime("%d.%m %H:%M") + ": " + str(self.predictions[time].power_watt) +\
                    "  (irradiance=" + str(self.predictions[time].irradiance) + \
                    ", visibility=" + str(self.predictions[time].visibility) + \
+                   ", probability_for_fog=" + str(self.predictions[time].probability_for_fog) + \
                    ", cloud_cover=" + str(self.predictions[time].cloud_cover) + ")\n"
         return txt
 

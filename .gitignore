@@ -141,3 +141,4 @@ dmypy.json
 /pvpower/weather_forecast2.py
 /pvpower/dev_mosmix.py
 /pvpower/weather_forecast_old.py
+/pvpower/train.csv.gz

@@ -85,6 +85,9 @@ class ParameterSeries:
 
 class MosmixS:
 
+    # x-check https://mosmix.de/online.html#/station/10724/station
+    # parameters (https://dwd-geoportal.de/products/G_FJM/)
+
     def __init__(self,station_id: str):
         self.station_id = station_id
         self.__fetch_datetime = datetime.now()

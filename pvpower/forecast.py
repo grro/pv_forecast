@@ -41,7 +41,7 @@ class PvPowerForecast:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
-        logging.info("train log " + self.train_log.filename)
+        logging.info("train log " + self.train_log.filename())
         self.__train_value_recorder = ValueRecorder()
         self.__estimator = Estimator()
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
