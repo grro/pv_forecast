@@ -21,6 +21,12 @@ dwd_station_id = 'L160'
 pv_power_forecast = PvPowerForecast(dwd_station_id)
 ```
 
+To get the power forecast the power method has to be called
+```
+tomorrow = datetime.now() + timedelta(days=1)
+predicted_pv_power_watt_tomorrow = forecast.predict(tomorrow)
+```
+
 **Train the library with real measurements**
 
 It is essential that the PvPowerForecast library will be provided with real measured PV values of our PV system. 
@@ -34,14 +40,6 @@ while True:
     time.sleep(60)
 ```
 The provided train data will be store internally on disc and be used to update the internal prediction model. Please consider, that more accurate forecast predictions require collecting real PV power data for at least 2 weeks. Do not stop providing real PV power data, even though the prediction becomes better and better. You may use a periodic job to provide the real PV values
-
-**Perform a PV power forecast**
-
-To get the power forecast the power method has to be called 
-```
-tomorrow = datetime.now() + timedelta(days=1)
-predicted_pv_power_watt_tomorrow = forecast.predict(tomorrow)
-```
 
 **Energy management system support**
 
