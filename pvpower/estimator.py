@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 from typing import Optional
 from sklearn import svm
@@ -75,20 +75,22 @@ class Estimator:
 
     def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
         cleaned_samples = self.clean_data(samples)
+        if len(cleaned_samples) < 2:
+            # dummy values
+            logging.info("no train available. Using dummy values")
+            cleaned_samples = [LabelledWeatherForecast(datetime.now(), 0, 0, 0, 0, 0, 0),
+                               LabelledWeatherForecast(datetime.now() - timedelta(days=1), 0, 0, 0, 0, 0, 0)]
         num_samples = len(cleaned_samples)
         if self.num_samples_last_train != num_samples:
-            if num_samples < 2:
-                logging.warning("just " + str(len(cleaned_samples)) + " samples with irradiance > 0 are available. At least 2 samples are required")
-            else:
-                feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in cleaned_samples]
-                label_list = [sample.power_watt for sample in cleaned_samples]
-                if len(set(label_list)) > 1:
-                    self.__clf.fit(feature_vector_list, label_list)
-                    self.__num_samples_last_train = num_samples
+            feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in cleaned_samples]
+            label_list = [sample.power_watt for sample in cleaned_samples]
+            if len(set(label_list)) > 1:
+                self.__clf.fit(feature_vector_list, label_list)
+                self.__num_samples_last_train = num_samples
         return TrainReport(cleaned_samples)
 
     def __str__(self):
-        return "Model vectorizer=" + str(self.__vectorizer) + " trained with " + str(self.__num_samples_last_train) + " cleaned samples"
+        return "Model vectorizer=" + str(self.__vectorizer) + " trained with " + str(self.num_samples_last_train) + " cleaned samples"
 
     def predict(self, sample: WeatherForecast) -> Optional[int]:
         try:

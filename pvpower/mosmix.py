@@ -113,7 +113,7 @@ class MosmixS:
         return self.__timesteps_collector.timesteps[-1]
 
     def supports(self, dt: datetime) -> bool:
-        return self.data_from().strftime("%Y.%d.%m %H") <= dt.strftime("%Y.%d.%m %H") <= self.data_to().strftime("%Y.%d.%m %H")
+        return self.data_from() <= dt <= self.data_to()
 
     def issue_time(self) -> datetime:
         return self.__issue_time_collector.issue_time

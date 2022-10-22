@@ -21,10 +21,10 @@ dwd_station_id = 'L160'
 pv_power_forecast = PvPowerForecast(dwd_station_id)
 ```
 
-To get the power forecast the power method has to be called
+To get the power forecast the predict method has to be called
 ```
 tomorrow = datetime.now() + timedelta(days=1)
-predicted_pv_power_watt_tomorrow = forecast.predict(tomorrow)
+power_watt_tomorrow = forecast.predict(tomorrow)
 ```
 
 **Train the library with real measurements**

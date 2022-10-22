@@ -16,6 +16,9 @@ class ValueRecorder:
         self.time = self.__start_time + timedelta(minutes=round(window_size_min/2))
         self.__power_values = []
 
+    def empty(self) -> bool:
+        return len(self.__power_values) == 0
+
     def is_expired(self):
         return datetime.now() > self.__end_time
 
@@ -58,7 +61,7 @@ class PvPowerForecast:
     def current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
             try:
-                if self.__train_value_recorder.average is not None:
+                if not self.__train_value_recorder.empty():
                     weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
                     if weather_sample is not None:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
