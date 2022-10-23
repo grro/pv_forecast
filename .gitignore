@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 /pvpower/example.py
 /pvpower/dev_test.py
-/pvpower/dev_test_device_control.py
+/pvpower/dev_test_next24hours.py
 /pvpower/train.csv
 /pvpower/train_compare.py
 /requirements.txt

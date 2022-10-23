@@ -51,7 +51,7 @@ class WeatherStation:
         return self.__mosmixs.data_to()
 
     def __mosmix_is_expired(self) -> bool:
-        return self.__mosmixs.content_age_sec() > (60*60) and self.__mosmixs.elapsed_sec_fetched() > (25*60)
+        return self.__mosmixs.content_age_sec() > (90*60) and self.__mosmixs.elapsed_sec_fetched() > (15*60)
 
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()

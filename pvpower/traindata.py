@@ -1,5 +1,6 @@
 import logging
 import os
+import pytz
 import shutil
 import gzip
 import tempfile
@@ -34,7 +35,8 @@ class LabelledWeatherForecast(WeatherForecast):
         return "" if value is None else str(value)
 
     def to_csv(self) -> str:
-        return self.time.strftime("%d.%m.%Y %H:%M") + ";" + \
+        utc_time = self.time.astimezone(pytz.UTC)
+        return utc_time.strftime("%d.%m.%Y %H:%M") + ";" + \
                LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
                LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
                LabelledWeatherForecast.__to_string(self.sunshine) + ";" + \
@@ -44,7 +46,7 @@ class LabelledWeatherForecast(WeatherForecast):
 
     @staticmethod
     def csv_header() -> str:
-        return "time;real_pv_power;irradiance;sunshine;cloud_cover;probability_for_fog;visibility"
+        return "utc_time;real_pv_power;irradiance;sunshine;cloud_cover;probability_for_fog;visibility"
 
     @staticmethod
     def __to_int(txt):
@@ -56,14 +58,14 @@ class LabelledWeatherForecast(WeatherForecast):
     @staticmethod
     def from_csv(line: str):
         parts = line.split(";")
-        time = datetime.strptime(parts[0], "%d.%m.%Y %H:%M")
+        utc_time = datetime.strptime(parts[0] + ":00+00:00", "%d.%m.%Y %H:%M:%S%z")
         real_pv_power = LabelledWeatherForecast.__to_int(parts[1])
         irradiance = LabelledWeatherForecast.__to_int(parts[2])
         sunshine = LabelledWeatherForecast.__to_int(parts[3])
         cloud_cover_effective = LabelledWeatherForecast.__to_int(parts[4])
         probability_for_fog = LabelledWeatherForecast.__to_int(parts[5])
         visibility = LabelledWeatherForecast.__to_int(parts[6])
-        sample = LabelledWeatherForecast(time, irradiance, sunshine, cloud_cover_effective, probability_for_fog, visibility, real_pv_power)
+        sample = LabelledWeatherForecast(utc_time, irradiance, sunshine, cloud_cover_effective, probability_for_fog, visibility, real_pv_power)
         return sample
 
 
@@ -117,7 +119,7 @@ class TrainSampleLog:
                             try:
                                 samples.append(LabelledWeatherForecast.from_csv(line))
                             except Exception as e:
-                                pass
+                                logging.warning(e)
                         return samples
                 except Exception as e:
                     logging.warning("error occurred loading " + fn + " " + str(e))

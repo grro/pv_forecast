@@ -67,7 +67,8 @@ class PvPowerForecast:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
                                                                           self.__train_value_recorder.average,
                                                                           time=self.__train_value_recorder.time)
-                        self.__on_new_train_sample(annotated_sample)
+                        if self.__estimator.usable_as_train_sample(annotated_sample):
+                            self.__on_new_train_sample(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()
         self.__train_value_recorder.add(real_power)

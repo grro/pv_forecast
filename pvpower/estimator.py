@@ -1,8 +1,8 @@
 import logging
+import pytz
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
-from typing import Optional
 from sklearn import svm
 from typing import List
 from pvpower.weather_forecast import WeatherForecast
@@ -16,7 +16,8 @@ class Vectorizer(ABC):
         self._datetime_resolution_minutes = datetime_resolution_minutes
 
     def _minutes_of_day(self, dt: datetime) -> int:
-        return (dt.hour * 60) + dt.minute
+        utc_time = dt.astimezone(pytz.UTC)
+        return (utc_time.hour * 60) + utc_time.minute
 
     def _scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
@@ -68,11 +69,15 @@ class Estimator:
         # initialize with dummy data
         self.retrain([LabelledWeatherForecast(datetime.now(), 1, 0, 0, 0, 0, 0), LabelledWeatherForecast(datetime.now() - timedelta(days=1), 1, 0, 0, 0, 0, 1)])
 
+    def usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
+        return sample.irradiance > 0 \
+               and sample.sunshine is not None \
+               and sample.visibility is not None
+
     def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
         samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
-        samples = [sample for sample in samples if sample.irradiance > 0]
-        samples = [sample for sample in samples if sample.sunshine is not None and sample.visibility is not None]
+        samples = [sample for sample in samples if self.usable_as_train_sample(sample)]
         return samples
 
     def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:

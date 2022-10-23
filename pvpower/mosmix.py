@@ -2,6 +2,7 @@ import httpx
 import logging
 from stream_unzip import stream_unzip
 from typing import Dict
+import pytz
 from datetime import datetime, timezone
 from typing import List
 import xml.etree.ElementTree as ET
@@ -11,14 +12,12 @@ import xml.etree.ElementTree as ET
 class IssueTimeCollector:
 
     def __init__(self):
-        self.issue_time = None
+        self.issue_time_utc = None
 
     def consume(self, event, elem):
         if elem.tag.endswith("IssueTime"):
             if elem.text is not None:
-                time = datetime.fromisoformat(elem.text.replace("Z", "+00:00"))
-                local_time = time.replace(tzinfo=timezone.utc).astimezone(tz=None).replace(tzinfo=None)
-                self.issue_time = local_time
+                self.issue_time_utc = datetime.fromisoformat(elem.text.replace("Z", "+00:00"))
 
 
 class TimeStepsCollector:
@@ -33,9 +32,8 @@ class TimeStepsCollector:
             self.__is_collecting = True
         elif event == 'start' and self.__is_collecting and elem.tag.endswith("TimeStep"):
             if elem.text is not None:
-                time = datetime.fromisoformat(elem.text.replace("Z", "+00:00"))
-                local_time = time.replace(tzinfo=timezone.utc).astimezone(tz=None).replace(tzinfo=None)
-                self.timesteps.append(local_time)
+                utc_time = datetime.fromisoformat(elem.text.replace("Z", "+00:00"))
+                self.timesteps.append(utc_time)
         elif self.__is_collecting and event == 'end' and elem.tag.endswith("ForecastTimeSteps"):
             self.__is_collecting = False
 
@@ -90,73 +88,66 @@ class MosmixS:
 
     def __init__(self,station_id: str):
         self.station_id = station_id
-        self.__fetch_datetime = datetime.now()
+        self.__fetch_datetime_utc = datetime.utcnow()
         self.__issue_time_collector = IssueTimeCollector()
         self.__timesteps_collector = TimeStepsCollector()
         self.__forecasts_collector = ForecastValuesCollector(station_id)
-        self.__rad1h_series = None
-        self.__sund1_series = None
-        self.__neff_series = None
-        self.__wwm_series = None
-        self.__vv_series = None
-
+        self.__series_map = {}
 
     def consume(self, event, elem):
         self.__issue_time_collector.consume(event, elem)
         self.__timesteps_collector.consume(event, elem)
         self.__forecasts_collector.consume(event, elem)
 
-    def data_from(self) -> datetime:
+    def data_from_utc(self) -> datetime:
         return self.__timesteps_collector.timesteps[0]
 
-    def data_to(self) -> datetime:
+    def data_to_utc(self) -> datetime:
         return self.__timesteps_collector.timesteps[-1]
 
     def supports(self, dt: datetime) -> bool:
-        return self.data_from() <= dt <= self.data_to()
+        return self.data_from_utc() <= dt.astimezone(pytz.UTC) <= self.data_to_utc()
 
-    def issue_time(self) -> datetime:
-        return self.__issue_time_collector.issue_time
+    def issue_time_utc(self) -> datetime:
+        return self.__issue_time_collector.issue_time_utc
 
     def content_age_sec(self) -> int:
-        return int((datetime.now() - self.issue_time()).total_seconds())
+        return int((datetime.now(timezone.utc) - self.issue_time_utc()).total_seconds())
 
     def elapsed_sec_fetched(self):
-        return int((datetime.now() - self.__fetch_datetime).total_seconds())
+        return int((datetime.now(timezone.utc) - self.__fetch_datetime_utc).total_seconds())
+
+    def __read(self, parameter: str, dt: datetime) -> float:
+        if parameter not in self.__series_map.keys():
+            self.__series_map[parameter] = ParameterSeries(parameter, self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
+        utc_time = dt.astimezone(pytz.UTC)
+        value = self.__series_map.get(parameter).get(utc_time.strftime("%d.%m.%Y %H"))
+        #logging.debug("got " + str(value) + " for requested time " + dt.isoformat() + " (utc: " + utc_time.isoformat() + ")")
+        return value
 
     def rad1h(self, dt: datetime) -> float:
-        if self.__rad1h_series is None:
-            self.__rad1h_series = ParameterSeries("Rad1h", self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
-        return self.__rad1h_series.get(dt.strftime("%d.%m.%Y %H"))
+        return self.__read("Rad1h", dt)
 
     def sund1(self, dt: datetime) -> float:
-        if self.__sund1_series is None:
-            self.__sund1_series = ParameterSeries("SunD1", self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
-        return self.__sund1_series.get(dt.strftime("%d.%m.%Y %H"))
+        return self.__read("SunD1", dt)
 
     def neff(self, dt: datetime) -> float:
-        if self.__neff_series is None:
-            self.__neff_series = ParameterSeries("Neff", self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
-        return self.__neff_series.get(dt.strftime("%d.%m.%Y %H"))
+        return self.__read("Neff", dt)
 
     def wwm(self, dt: datetime) -> float:
-        if self.__wwm_series is None:
-            self.__wwm_series = ParameterSeries("wwM", self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
-        return self.__wwm_series.get(dt.strftime("%d.%m.%Y %H"))
+        return self.__read("wwM", dt)
 
     def vv(self, dt: datetime) -> float:
-        if self.__vv_series is None:
-            self.__vv_series = ParameterSeries("VV", self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
-        return self.__vv_series.get(dt.strftime("%d.%m.%Y %H"))
+        return self.__read("VV", dt)
 
-    def start_date(self) -> datetime:
+    def start_date_utc(self) -> datetime:
         return self.__timesteps_collector.timesteps[0]
 
-    def end_date(self) -> datetime:
+    def end_date_utc(self) -> datetime:
         return self.__timesteps_collector.timesteps[-1]
 
     def __str__(self):
-        return self.start_date().strftime("%d.%m.%Y %H:%M") + " -> " + self.end_date().strftime("%d.%m.%Y %H:%M")
+        return self.start_date_utc().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.end_date_utc().strftime("%d.%m.%Y %H:%M") + " utc"
 
     @staticmethod
     def __perform_get_chunked(url):
