@@ -88,7 +88,7 @@ class MosmixS:
 
     def __init__(self,station_id: str):
         self.station_id = station_id
-        self.__fetch_datetime_utc = datetime.utcnow()
+        self.__fetch_datetime_utc = datetime.now(timezone.utc)
         self.__issue_time_collector = IssueTimeCollector()
         self.__timesteps_collector = TimeStepsCollector()
         self.__forecasts_collector = ForecastValuesCollector(station_id)
