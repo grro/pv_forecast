@@ -99,14 +99,14 @@ class MosmixS:
         self.__timesteps_collector.consume(event, elem)
         self.__forecasts_collector.consume(event, elem)
 
-    def data_from_utc(self) -> datetime:
+    def utc_date_from(self) -> datetime:
         return self.__timesteps_collector.utc_timesteps[0]
 
-    def data_to_utc(self) -> datetime:
+    def utc_date_to(self) -> datetime:
         return self.__timesteps_collector.utc_timesteps[-1]
 
     def supports(self, dt: datetime) -> bool:
-        return self.data_from_utc() <= dt.astimezone(pytz.UTC) <= self.data_to_utc()
+        return self.utc_date_from() <= dt.astimezone(pytz.UTC) <= self.utc_date_to()
 
     def issue_time_utc(self) -> datetime:
         return self.__issue_time_collector.issue_time_utc
@@ -141,7 +141,7 @@ class MosmixS:
         return self.__read("VV", dt)
 
     def __str__(self):
-        return self.data_from_utc().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.data_to_utc().strftime("%d.%m.%Y %H:%M") + " utc"
+        return self.utc_date_from().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.utc_date_to().strftime("%d.%m.%Y %H:%M") + " utc"
 
     @staticmethod
     def __perform_get_chunked(url):

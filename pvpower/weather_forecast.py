@@ -49,7 +49,7 @@ class WeatherStation:
 
     def __refresh(self):
         mosmixs = MosmixS.load(self.__station)
-        if mosmixs.start_date() > self.__mosmixs.start_date():   # save old prediction
+        if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():   # save old prediction
             self.__previous_mosmixs = self.__mosmixs
         self.__mosmixs = mosmixs
 
