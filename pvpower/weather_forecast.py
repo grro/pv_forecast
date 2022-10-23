@@ -1,4 +1,5 @@
 import logging
+import pytz
 from dataclasses import dataclass
 from datetime import datetime
 from pvpower.mosmix import MosmixS
@@ -29,6 +30,14 @@ class WeatherForecast:
                self.cloud_cover is not None and \
                self.probability_for_fog is not None and \
                self.visibility is not None
+
+    def __str__(self):
+        return self.time.astimezone(pytz.UTC).strftime("%Y.%m.%d %H:%M") + " utc" + \
+               ", irradiance=" + str(round(self.irradiance)) + \
+               ", sunshine=" + str(round(self.sunshine)) + \
+               ", cloud_cover=" + str(round(self.cloud_cover)) + \
+               ", probability_for_fog=" + str(round(self.probability_for_fog)) + \
+               ", visibility=" + str(round(self.visibility))
 
 
 class WeatherStation:

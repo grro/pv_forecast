@@ -94,7 +94,7 @@ class PvPowerForecast:
                          " -> " + self.weather_forecast_service.forcast_to().strftime("%Y.%m.%d %H:%M")  + "). Returning None")
             return None
         else:
-            logging.debug("got weather forecast for requested date time: " + time.strftime("%Y.%m.%d %H:%M") + ": " + str(sample))
+            logging.debug("weather forecast for requested date time " + time.strftime("%Y.%m.%d %H:%M") + " ->  " + str(sample))
             predicted_power_watt = self.predict_by_weather_forecast(sample)
             logging.debug("predicted power " + str(predicted_power_watt) + " watt")
             return predicted_power_watt

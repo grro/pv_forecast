@@ -24,16 +24,16 @@ class TimeStepsCollector:
 
     def __init__(self):
         self.__is_collecting = False
-        self.timesteps = []
+        self.utc_timesteps = []
 
     def consume(self, event, elem):
         if event == 'start' and elem.tag.endswith("ForecastTimeSteps"):
-            self.timesteps.clear()
+            self.utc_timesteps.clear()
             self.__is_collecting = True
         elif event == 'start' and self.__is_collecting and elem.tag.endswith("TimeStep"):
             if elem.text is not None:
                 utc_time = datetime.fromisoformat(elem.text.replace("Z", "+00:00"))
-                self.timesteps.append(utc_time)
+                self.utc_timesteps.append(utc_time)
         elif self.__is_collecting and event == 'end' and elem.tag.endswith("ForecastTimeSteps"):
             self.__is_collecting = False
 
@@ -76,9 +76,9 @@ class ForecastValuesCollector:
 
 class ParameterSeries:
 
-    def __init__(self, name: str, time_series: List[datetime], values: Dict[str, List[float]]):
+    def __init__(self, name: str, utc_time_series: List[datetime], values: Dict[str, List[float]]):
         self.name = name
-        self.series = { time_series[i].strftime("%d.%m.%Y %H"): values[name][i] for i in range(0, len(time_series)) }
+        self.series = { utc_time_series[i].strftime("%d.%m.%Y %H"): values[name][i] for i in range(0, len(utc_time_series)) }
 
 
 class MosmixS:
@@ -100,10 +100,10 @@ class MosmixS:
         self.__forecasts_collector.consume(event, elem)
 
     def data_from_utc(self) -> datetime:
-        return self.__timesteps_collector.timesteps[0]
+        return self.__timesteps_collector.utc_timesteps[0]
 
     def data_to_utc(self) -> datetime:
-        return self.__timesteps_collector.timesteps[-1]
+        return self.__timesteps_collector.utc_timesteps[-1]
 
     def supports(self, dt: datetime) -> bool:
         return self.data_from_utc() <= dt.astimezone(pytz.UTC) <= self.data_to_utc()
@@ -119,7 +119,7 @@ class MosmixS:
 
     def __read(self, parameter: str, dt: datetime) -> float:
         if parameter not in self.__series_map.keys():
-            self.__series_map[parameter] = ParameterSeries(parameter, self.__timesteps_collector.timesteps, self.__forecasts_collector.parameters).series
+            self.__series_map[parameter] = ParameterSeries(parameter, self.__timesteps_collector.utc_timesteps, self.__forecasts_collector.parameters).series
         utc_time = dt.astimezone(pytz.UTC)
         value = self.__series_map.get(parameter).get(utc_time.strftime("%d.%m.%Y %H"))
         #logging.debug("got " + str(value) + " for requested time " + dt.isoformat() + " (utc: " + utc_time.isoformat() + ")")
@@ -140,14 +140,8 @@ class MosmixS:
     def vv(self, dt: datetime) -> float:
         return self.__read("VV", dt)
 
-    def start_date_utc(self) -> datetime:
-        return self.__timesteps_collector.timesteps[0]
-
-    def end_date_utc(self) -> datetime:
-        return self.__timesteps_collector.timesteps[-1]
-
     def __str__(self):
-        return self.start_date_utc().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.end_date_utc().strftime("%d.%m.%Y %H:%M") + " utc"
+        return self.data_from_utc().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.data_to_utc().strftime("%d.%m.%Y %H:%M") + " utc"
 
     @staticmethod
     def __perform_get_chunked(url):

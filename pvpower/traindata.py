@@ -155,7 +155,7 @@ class TrainSampleLog:
                 num_samples = len(samples)
                 num_survived = 0
                 for sample in samples:
-                    if sample.time > min_datetime:
+                    if sample.time.astimezone(pytz.UTC) > min_datetime.astimezone(pytz.UTC):
                         num_survived += 1
                         line = sample.to_csv() + "\n"
                         file.write(line.encode(encoding='UTF-8'))

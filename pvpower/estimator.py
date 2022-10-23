@@ -15,7 +15,7 @@ class Vectorizer(ABC):
     def __init__(self, datetime_resolution_minutes: int = 20):
         self._datetime_resolution_minutes = datetime_resolution_minutes
 
-    def _minutes_of_day(self, dt: datetime) -> int:
+    def _utc_minutes_of_day(self, dt: datetime) -> int:
         utc_time = dt.astimezone(pytz.UTC)
         return (utc_time.hour * 60) + utc_time.minute
 
@@ -35,10 +35,10 @@ class SimpleVectorizer(Vectorizer):
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         window_minutes = 15
         vectorized = [self._scale(sample.time.month, 12),
-                      self._scale(int(self._minutes_of_day(sample.time)/window_minutes), int((24*60)/window_minutes)),
+                      self._scale(int(self._utc_minutes_of_day(sample.time)/window_minutes), int((24*60)/window_minutes)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000)]
-        logging.debug(sample.time.strftime("%b %H:%M") + ";irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
+        logging.debug(sample.time.astimezone(pytz.UTC).strftime("%b %H:%M") + " utc;irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
         return vectorized
 
     def __str__(self):
