@@ -1,6 +1,6 @@
 # photovoltaic power forecast
 
-pv_forecast provides a set of classes to obtain PV solar power forecast. Internally this library uses machine learning to perform PV power forecasts.
+pv_forecast provides a set of artefacts to obtain PV solar power forecast. Internally this library uses machine learning approaches to perform PV power forecasts.
 To get appropriated results, real measured PV power values must be provided. Internally, the library make use of [DWD](https://dwd-geoportal.de/products/G_FJM/) weather forecast data.
 
 **Installing the library**
@@ -30,8 +30,10 @@ power_watt_tomorrow = forecast.predict(tomorrow)
 **Train the library with real measurements**
 
 It is essential that the PvPowerForecast library will be provided with real measured PV values of our PV system. 
-The provided real data is used as train data to adapt the internal prediction model on your environment. 
-Providing additional technical parameters of your PV system such as installed power or cardinal direction is not required. This **libray is self-learning**.
+The provided real data is used to adapt the internal prediction model to your specific environment. 
+Providing technical parameters of your PV system such as installed power or cardinal direction is not required. 
+The **libray is self-learning**.
+
 ```
 # please provide the real measured PV power value periodically. The period should be between 1 minute and 10 minutes.
 while True:
@@ -39,7 +41,10 @@ while True:
     pv_power_forecast.current_power_reading(real_pv_power_watt)
     time.sleep(60)
 ```
-The provided train data will be store internally on disc and be used to update the internal prediction model. Please consider, that more accurate forecast predictions require collecting real PV power data for at least 2 weeks. Do not stop providing real PV power data, even though the prediction becomes better and better. You may use a periodic job to provide the real PV values
+The provided real measurements will be stored internally on disc and be used to update the internal prediction model. 
+Please consider, that more accurate forecast predictions require collecting real PV power data for at least 2 weeks. 
+Do not stop providing measurements, even though the prediction becomes better and better. 
+You may use a periodic job to provide the real PV values
 
 **Energy management system support**
 
@@ -57,8 +62,8 @@ peek_watt = next24h.peek()
 ```
 
 To start your home appliance such as a dishwasher at the right time you may query the available execution time frames. 
-In the example below the frames will be filtered considering the basic electricity consumption. Time frames will be considered only, 
-if the solar power is higher than the basic electricity consumption. In the example an average basic consumption of 350 watt is expected.
+In the example below the frames will be filtered considering a hypothetical electricity consumption of 350 watt per hour. Time frames will be considered only, 
+if the solar power is higher than the expected electricity consumption. 
 Based on the resulting time frames the best one is used to start the home appliance in a delayed way.  
 ```
 ...

@@ -115,13 +115,21 @@ class Next24hours:
         return TimeFrames(frames)
 
     def __str__(self):
-        txt = ""
+        txt = "local time .......... pv power ..... irradiance ..... visibility .... fog probab. .... cloud cover\n"
         for time in list(self.predictions.keys())[:24]:
-            txt += time.strftime("%d.%m %H:%M") + ": " + str(self.predictions[time].power_watt) +\
-                   "  (irradiance=" + str(self.predictions[time].irradiance) + \
-                   ", visibility=" + str(self.predictions[time].visibility) + \
-                   ", probability_for_fog=" + str(self.predictions[time].probability_for_fog) + \
-                   ", cloud_cover=" + str(self.predictions[time].cloud_cover) + ")\n"
+            power = str(round(self.predictions[time].power_watt))
+            irradiance = str(round(self.predictions[time].irradiance))
+            visibility = str(round(self.predictions[time].visibility))
+            probability_for_fog = str(round(self.predictions[time].probability_for_fog))
+            cloud_cover = str(round(self.predictions[time].cloud_cover))
+            txt += time.strftime("%d %b, %H:%M") + " " + \
+                   "".join(["."] * (10 - len(power))) + " " + power + " watt " + \
+                   "".join(["."] * (15 - len(irradiance))) + " " + irradiance + " " + \
+                   "".join(["."] * (15 - len(visibility))) + " " + visibility + " " + \
+                   "".join(["."] * (15 - len(probability_for_fog))) + " " + probability_for_fog +  " " + \
+                   "".join(["."] * (15 - len(cloud_cover))) + " " + cloud_cover + "\n"
         return txt
+
+
 
 
