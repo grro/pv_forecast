@@ -68,6 +68,17 @@ class TimeFrames:
     def all(self) -> List[TimeFrame]:
         return list(self.__frames)
 
+    def __str__(self):
+        txt = "start .......... end ................ pv power total ........... power per hour\n"
+        for frame in sorted(self.__frames, key=lambda frame: frame.start_time, reverse=False):
+            power = str(round(frame.power_total))
+            power_per_hour = ", ".join([str(round(power)) for power in frame.hourly_power])
+            txt += frame.start_time.strftime("%d %b, %H:%M") + " .. " + \
+                   frame.end_time.strftime("%d %b, %H:%M") + " " + \
+                   "".join(["."] * (15 - len(power))) + " " + power + " watt" + " " + \
+                   "".join(["."] * (25 - len(power_per_hour))) + " " + power_per_hour + "\n"
+        return txt
+
 
 class Next24hours:
 

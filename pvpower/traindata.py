@@ -10,10 +10,9 @@ from pathlib import Path
 from os.path import exists
 from threading import RLock
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 from pvpower.weather_forecast import WeatherForecast
-
 
 
 @dataclass(frozen=True)
@@ -49,7 +48,7 @@ class LabelledWeatherForecast(WeatherForecast):
         return "utc_time;real_pv_power;irradiance;sunshine;cloud_cover;probability_for_fog;visibility"
 
     @staticmethod
-    def __to_int(txt):
+    def __to_int(txt) -> Optional[int]:
         if len(txt) > 0:
             return int(float(txt))
         else:
@@ -105,7 +104,6 @@ class TrainSampleLog:
             self.__last_compaction_time = datetime.now()
             Thread(target=self.compact, args=(15,), daemon=True).start()
 
-
     def all(self) -> List[LabelledWeatherForecast]:
         with self.lock:
             # plain file
@@ -149,7 +147,7 @@ class TrainSampleLog:
         min_datetime = datetime.now() - timedelta(days=400)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            temp_file = os.path.join(tmp_dir, 'trainfile.temp')
+            temp_file = os.path.join(tmp_dir, 'traindata.csv')
             with gzip.open(temp_file, "wb") as file:
                 file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 num_samples = len(samples)

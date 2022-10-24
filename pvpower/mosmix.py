@@ -150,7 +150,6 @@ class MosmixS:
 
     @staticmethod
     def load(station_id: str, url: str = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'):
-        logging.debug("loading MOSMIX_S")
         mosmix = MosmixS(station_id)
         xml_parser = ET.XMLPullParser(['start', 'end'])
         for file_name, file_size, unzipped_chunks in stream_unzip(MosmixS.__perform_get_chunked(url)):
@@ -158,6 +157,5 @@ class MosmixS:
                 xml_parser.feed(chunk)
                 for event, elem in xml_parser.read_events():
                     mosmix.consume(event, elem)
-        logging.info("MOSMIX_S loaded (" + str(mosmix) + ")")
         return mosmix
 

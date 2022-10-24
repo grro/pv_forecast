@@ -49,9 +49,12 @@ class WeatherStation:
 
     def __refresh(self):
         mosmixs = MosmixS.load(self.__station)
-        if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():   # save old prediction
+        if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():
+            logging.info("updated mosmix file loaded ")
             self.__previous_mosmixs = self.__mosmixs
-        self.__mosmixs = mosmixs
+            self.__mosmixs = mosmixs
+        else:
+            logging.info("loaded mosmix file is unchanged. ignoring it")
 
     def forcast_from(self) -> datetime:
         return self.__previous_mosmixs.data_from()
@@ -76,11 +79,11 @@ class WeatherStation:
             return None
 
         forecast = WeatherForecast(time,
-                                   mosmixs.rad1h(time),
-                                   mosmixs.sund1(time),
-                                   mosmixs.neff(time),
-                                   mosmixs.wwm(time),
-                                   mosmixs.vv(time))
+                                   int(mosmixs.rad1h(time)),
+                                   int(mosmixs.sund1(time)),
+                                   int(mosmixs.neff(time)),
+                                   int(mosmixs.wwm(time)),
+                                   int(mosmixs.vv(time)))
         if forecast.is_valid():
             return forecast
         else:

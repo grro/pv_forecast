@@ -13,7 +13,7 @@ sudo pip install pvpower
 **Using the library**
 
 After this installation you should configure the library with your environment parameters.
-You have to set the closest DWD station id of the location of our PV system. To find the proper station id refer [DWD station list](https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102)     
+You have to set the closest DWD station id of our PV system location. To find the proper station id refer [DWD station list](https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102)     
 ```
 from pvpower.forecast import PvPowerForecast
 
@@ -35,21 +35,23 @@ Providing technical parameters of your PV system such as installed power or card
 The **libray is self-learning**.
 
 ```
-# please provide the real measured PV power value periodically. The period should be between 1 minute and 10 minutes.
+# please provide the real measured PV power value periodically. 
+# The period should be between 1 minute and 15 minutes.
+
 while True:
     real_pv_power_watt = ...read real PV power ...
     pv_power_forecast.current_power_reading(real_pv_power_watt)
     time.sleep(60)
 ```
 The provided real measurements will be stored internally on disc and be used to update the internal prediction model. 
-Please consider, that more accurate forecast predictions require collecting real PV power data for at least 2 weeks. 
+Please consider, that more accurate forecast predictions require collecting real PV measurements for at least 2 weeks, typically. 
 Do not stop providing measurements, even though the prediction becomes better and better. 
 You may use a periodic job to provide the real PV values
 
 **Energy management system support**
 
 The basic functionality of this library is to support photovoltaic power forecast. However, to maximize the yield 
-of your PV system, home appliances such as a dishwasher or laundry machines should operate only in periods when 
+of your PV system, your home appliances such as a dishwasher or laundry machines should operate only in periods when 
 your PV system is delivering sufficient solar power. To manage this, the *Next24hours* convenience class can be used as shown below 
 ```
 from pvpower.forecast import PvPowerForecast
@@ -62,8 +64,8 @@ peek_watt = next24h.peek()
 ```
 
 To start your home appliance such as a dishwasher at the right time you may query the available execution time frames. 
-In the example below the frames will be filtered considering a hypothetical electricity consumption of 350 watt per hour. Time frames will be considered only, 
-if the solar power is higher than the expected electricity consumption. 
+In the example below the frames will be filtered considering a hypothetical basic electricity consumption of 350 watt per hour. Time frames will be considered only, 
+if the solar power is higher than the expected basic electricity consumption. 
 Based on the resulting time frames the best one is used to start the home appliance in a delayed way.  
 ```
 ...
