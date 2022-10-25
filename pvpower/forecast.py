@@ -58,7 +58,7 @@ class PvPowerForecast:
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
-    def current_power_reading(self, real_power: int):
+    def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
             try:
                 if not self.__train_value_recorder.empty():

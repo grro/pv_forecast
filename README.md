@@ -1,7 +1,7 @@
 # photovoltaic power forecast
 
-pv_forecast provides a set of artefacts to obtain PV solar power forecast. Internally this library uses machine learning approaches to perform PV power forecasts.
-To get appropriated results, real measured PV power values must be provided. Internally, the library make use of [DWD](https://dwd-geoportal.de/products/G_FJM/) weather forecast data.
+pv_forecast provides a set of artifacts to obtain PV solar power forecast. The library uses machine learning approaches to perform forecasts.
+To get appropriated results, real measured PV power values must be delivered, periodically. Internally, the library make use of [DWD](https://dwd-geoportal.de/products/G_FJM/) weather forecast data.
 
 **Installing the library**
 
@@ -13,7 +13,7 @@ sudo pip install pvpower
 **Using the library**
 
 After this installation you should configure the library with your environment parameters.
-You have to set the closest DWD station id of our PV system location. To find the proper station id refer [DWD station list](https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102)     
+You have to set the closest DWD station id of our PV system location. Refer [DWD station list](https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102) to select the proper station id.     
 ```
 from pvpower.forecast import PvPowerForecast
 
@@ -21,7 +21,7 @@ dwd_station_id = 'L160'
 pv_power_forecast = PvPowerForecast(dwd_station_id)
 ```
 
-To get the power forecast the predict method has to be called
+To get a power forecast, the predict method has to be called
 ```
 tomorrow = datetime.now() + timedelta(days=1)
 power_watt_tomorrow = forecast.predict(tomorrow)
@@ -29,10 +29,10 @@ power_watt_tomorrow = forecast.predict(tomorrow)
 
 **Train the library with real measurements**
 
-It is essential that the PvPowerForecast library will be provided with real measured PV values of our PV system. 
-The provided real data is used to adapt the internal prediction model to your specific environment. 
+It is essential that the PvPowerForecast library is provided with real measured PV values of our PV system. 
+The provided real data is used to adapt the internal machine learning engine to your specific environment. 
 Providing technical parameters of your PV system such as installed power or cardinal direction is not required. 
-The **libray is self-learning**.
+The **library is self-learning**.
 
 ```
 # please provide the real measured PV power value periodically. 
@@ -40,7 +40,7 @@ The **libray is self-learning**.
 
 while True:
     real_pv_power_watt = ...read real PV power ...
-    pv_power_forecast.current_power_reading(real_pv_power_watt)
+    pv_power_forecast.add_current_power_reading(real_pv_power_watt)
     time.sleep(60)
 ```
 The provided real measurements will be stored internally on disc and be used to update the internal prediction model. 
