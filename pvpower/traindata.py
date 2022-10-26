@@ -152,8 +152,14 @@ class TrainSampleLog:
                 file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
                 num_samples = len(samples)
                 num_survived = 0
+                previous_sample = None
                 for sample in samples:
-                    if sample.time.astimezone(pytz.UTC) > min_datetime.astimezone(pytz.UTC):
+                    expired = sample.time.astimezone(pytz.UTC) < min_datetime.astimezone(pytz.UTC)
+                    duplicate = False
+                    if previous_sample is not None:
+                        duplicate = previous_sample.time.astimezone(pytz.UTC) == sample.time.astimezone(pytz.UTC)
+                    previous_sample = sample
+                    if not expired and not duplicate:
                         num_survived += 1
                         line = sample.to_csv() + "\n"
                         file.write(line.encode(encoding='UTF-8'))
