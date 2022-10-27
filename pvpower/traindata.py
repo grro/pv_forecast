@@ -69,11 +69,12 @@ class LabelledWeatherForecast(WeatherForecast):
 
 
 class TrainSampleLog:
+    COMPACTION_PERIOD_DAYS = 10
 
     def __init__(self, dirname: str):
         self.lock = RLock()
         self.__dirname = dirname
-        self.__last_compaction_time = datetime.now() - timedelta(days=30)
+        self.__last_compaction_time = datetime.now() - timedelta(days=self.COMPACTION_PERIOD_DAYS*2)
 
     def filename(self, compressed: bool = False):
         if compressed:
@@ -100,7 +101,7 @@ class TrainSampleLog:
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
 
-        if datetime.now() > (self.__last_compaction_time + timedelta(days=10)):
+        if datetime.now() > (self.__last_compaction_time + timedelta(days=self.COMPACTION_PERIOD_DAYS)):
             self.__last_compaction_time = datetime.now()
             Thread(target=self.compact, args=(15,), daemon=True).start()
 
