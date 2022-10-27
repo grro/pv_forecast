@@ -1,9 +1,18 @@
+import logging
 from typing import List
 from pvpower.traindata import TrainSampleLog
-from pvpower.estimator import Estimator, Vectorizer, SimpleVectorizer
+from pvpower.estimator import Estimator, Vectorizer
 from pvpower.forecast import WeatherForecast
 from pvpower.tester import Tester
 
+
+class CoreVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time)/10), int((24*60)/10)),
+                      self._scale(sample.irradiance, 1000)]
+        return vectorized
 
 
 class PlusVisibilityVectorizer(Vectorizer):
@@ -111,7 +120,7 @@ class VectorizerTester:
         trainlog = TrainSampleLog(train_dir)
         self.__samples = trainlog.all()
         self.__vectorizer_map = {
-            "core": SimpleVectorizer(),
+            "core": CoreVectorizer(),
             "+visibility": PlusVisibilityVectorizer(),
             "+sunshine": PlusSunshineVectorizer(),
             "+cloudcover": PlusCloudCoverVectorizer(),
@@ -120,18 +129,20 @@ class VectorizerTester:
             "+visibility +cloudcover": PlusVisibilityCloudCoverVectorizer(),
             "+visibility +fog": PlusVisibilityFogVectorizer(),
             "+visibility +fog +cloudcover": PlusVisibilityFogCloudCoverVectorizer(),
-            "all": AllVectorizer(),
+            "+visibility +fog +cloudcover +sunshine": AllVectorizer(),
         }
 
     def report(self) -> str:
-        report = "variant ................................. score ....... distribution\n"
+        report = "tested with " + str(len(self.__samples)) + " samples" + "\n"
+        report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
         for variant in self.__vectorizer_map.keys():
             test_reports = Tester(self.__samples).evaluate(Estimator(vectorizer=self.__vectorizer_map[variant]))
             median_report = test_reports[int(len(test_reports)*0.5)]
-            score = str(round(median_report.score, 1))
+            score = str(round(median_report.score))
             distribution = str(round(test_reports[0].score)) + ", " + str(round(test_reports[1].score)) + ", " + str(round(test_reports[2].score)) + ", " + str(round(test_reports[3].score)) + ", ..., " + str(round(test_reports[int(len(test_reports)*0.5)].score)) + ", ..., " + str(round(test_reports[-4].score)) + ", " + str(round(test_reports[-3].score)) + ", " + str(round(test_reports[-2].score)) + ", " + str(round(test_reports[-1].score))
             report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score)))) + " " + score + " ....... " + distribution + "\n"
+            logging.info("variant " + variant + " analyzed")
         return report
 
 
-#print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
+print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
