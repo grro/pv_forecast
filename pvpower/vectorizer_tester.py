@@ -133,7 +133,8 @@ class VectorizerTester:
         }
 
     def report(self) -> str:
-        report = "tested with " + str(len(self.__samples)) + " samples" + "\n"
+        days = len(set([sample.time.strftime("%Y.%m.%d")  for sample in self.__samples]))
+        report = "tested with " + str(len(self.__samples)) + " samples (" + str(days) + " days)" + "\n"
         report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
         for variant in self.__vectorizer_map.keys():
             test_reports = Tester(self.__samples).evaluate(Estimator(vectorizer=self.__vectorizer_map[variant]))
@@ -145,4 +146,4 @@ class VectorizerTester:
         return report
 
 
-print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
+#print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
