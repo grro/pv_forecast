@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from pvpower.forecast import PvPowerForecast, LabelledWeatherForecast
@@ -9,12 +10,12 @@ class TimeFrame:
         self.__hourly_forecasts = hourly_forecasts
 
     @property
-    def start_time(self) -> datetime:
-        return self.__hourly_forecasts[0].time
+    def start_time_utc(self) -> datetime:
+        return self.__hourly_forecasts[0].utc_time
 
     @property
-    def end_time(self) -> datetime:
-        return self.__hourly_forecasts[-1].time + timedelta(minutes=59)
+    def end_time_utc(self) -> datetime:
+        return self.__hourly_forecasts[-1].utc_time + timedelta(minutes=59)
 
     @property
     def width_hours(self) -> int:
@@ -29,22 +30,22 @@ class TimeFrame:
         return sum(self.hourly_power)
 
     def __lt__(self, other):
-        return self.start_time < other.start_time
+        return self.start_time_utc < other.start_time
 
     def __eq__(self, other):
-        return self.start_time == other.start_time
+        return self.start_time_utc == other.start_time
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self) -> str:
-        return self.__hourly_forecasts[0].time.strftime("%d.%m %H:%M") + " -> " + self.__hourly_forecasts[-1].time.strftime("%H") + ":59" + "; total: " + ", ".join([str(hourly_forecast.power_watt) for hourly_forecast in self.__hourly_forecasts])
+        return self.__hourly_forecasts[0].utc_time.strftime("%d.%m %H:%M") + " -> " + self.__hourly_forecasts[-1].utc_time.strftime("%H") + ":59" + "; total: " + ", ".join([str(hourly_forecast.power_watt) for hourly_forecast in self.__hourly_forecasts])
 
 
 class TimeFrames:
 
     def __init__(self, frames: List[TimeFrame]):
-        self.__frames = sorted(frames, key=lambda frame: "{0:10d}".format(1000000-frame.power_total) + frame.start_time.strftime("%d.%m.%Y %H"), reverse=False)
+        self.__frames = sorted(frames, key=lambda frame: "{0:10d}".format(1000000-frame.power_total) + frame.start_time_utc.strftime("%d.%m.%Y %H"), reverse=False)
 
     def filter(self, min_watt_per_hour: int):
         filtered_frames = [frame for frame in self.__frames if max(sorted(frame.hourly_power)) > min_watt_per_hour]
@@ -68,13 +69,16 @@ class TimeFrames:
     def all(self) -> List[TimeFrame]:
         return list(self.__frames)
 
+    def __utc_time_to_local(self, utc_time) -> datetime:
+        return utc_time + (datetime.now() - datetime.utcnow())
+
     def __str__(self):
-        txt = "start .......... end ................ pv power total ........... power per hour\n"
-        for frame in sorted(self.__frames, key=lambda frame: frame.start_time, reverse=False):
+        txt = "local start time ... local end time .......... pv power total ........... power per hour\n"
+        for frame in sorted(self.__frames, key=lambda frame: frame.start_time_utc, reverse=False):
             power = str(round(frame.power_total))
             power_per_hour = ", ".join([str(round(power)) for power in frame.hourly_power])
-            txt += frame.start_time.strftime("%d %b, %H:%M") + " .. " + \
-                   frame.end_time.strftime("%d %b, %H:%M") + " " + \
+            txt += self.__utc_time_to_local(frame.start_time_utc).strftime("%d %b, %H:%M") + "  ..... " + \
+                   self.__utc_time_to_local(frame.end_time_utc).strftime("%d %b, %H:%M") + " " + \
                    "".join(["."] * (15 - len(power))) + " " + power + " watt" + " " + \
                    "".join(["."] * (25 - len(power_per_hour))) + " " + power_per_hour + "\n"
         return txt
@@ -93,11 +97,11 @@ class Next24hours:
             if weather_forecast is not None:
                 predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
                 if predicted_value is not None:
-                    predictions[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
+                    predictions[weather_forecast.utc_time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
         return Next24hours(predictions)
 
     def __prediction_values(self) -> List[int]:
-        return [forecast.power_watt for forecast in self.predictions.values() if forecast.time <= (datetime.now() + timedelta(hours=24))]
+        return [forecast.power_watt for forecast in self.predictions.values() if forecast.utc_time <= (datetime.now() + timedelta(hours=24)).astimezone(pytz.UTC)]
 
     def peek(self) -> int:
         return max(self.__prediction_values())
@@ -122,7 +126,7 @@ class Next24hours:
             forecasts = [self.predictions[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
             frame = TimeFrame(forecasts)
             frames.append(frame)
-        frames = [frame for frame in frames if frame.start_time <= datetime.now() + timedelta(hours=24)]
+        frames = [frame for frame in frames if frame.start_time_utc <= (datetime.now() + timedelta(hours=24)).astimezone(pytz.UTC)]
         return TimeFrames(frames)
 
     def __str__(self):

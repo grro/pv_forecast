@@ -15,13 +15,24 @@ from dataclasses import dataclass
 from pvpower.weather_forecast import WeatherForecast
 
 
-@dataclass(frozen=True)
 class LabelledWeatherForecast(WeatherForecast):
-    power_watt: int
+
+    def __init__(self,
+                 time: datetime,
+                 irradiance: int,
+                 sunshine: int,
+                 cloud_cover: int,
+                 probability_for_fog: int,
+                 visibility: int,
+                 power_watt: int):
+        super().__init__(time, irradiance, sunshine, cloud_cover, probability_for_fog, visibility)
+        self.power_watt = power_watt
+
 
     @staticmethod
     def create(weather_forecast: WeatherForecast, power_watt: int, time: datetime = None):
-        return LabelledWeatherForecast(weather_forecast.time if time is None else time,
+
+        return LabelledWeatherForecast(weather_forecast.utc_time if time is None else time,
                                        weather_forecast.irradiance,
                                        weather_forecast.sunshine,
                                        weather_forecast.cloud_cover,
@@ -34,7 +45,7 @@ class LabelledWeatherForecast(WeatherForecast):
         return "" if value is None else str(value)
 
     def to_csv(self) -> str:
-        utc_time = self.time.astimezone(pytz.UTC)
+        utc_time = self.utc_time
         return utc_time.strftime("%d.%m.%Y %H:%M") + ";" + \
                LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
                LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
@@ -155,10 +166,10 @@ class TrainSampleLog:
                 num_survived = 0
                 previous_sample = None
                 for sample in samples:
-                    expired = sample.time.astimezone(pytz.UTC) < min_datetime.astimezone(pytz.UTC)
+                    expired = sample.utc_time < min_datetime.astimezone(pytz.UTC)
                     duplicate = False
                     if previous_sample is not None:
-                        duplicate = previous_sample.time.astimezone(pytz.UTC) == sample.time.astimezone(pytz.UTC)
+                        duplicate = previous_sample.utc_time == sample.utc_time
                     previous_sample = sample
                     if not expired and not duplicate:
                         num_survived += 1

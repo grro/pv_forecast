@@ -33,8 +33,8 @@ class Vectorizer(ABC):
 class FullVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.utc_time.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.probability_for_fog, 100),
@@ -76,7 +76,7 @@ class Estimator:
 
     def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
-        samples = list(filter(lambda sample: seen.append(sample.time) is None if sample.time not in seen else False, samples))
+        samples = list(filter(lambda sample: seen.append(sample.utc_time) is None if sample.utc_time not in seen else False, samples))
         samples = [sample for sample in samples if self.usable_as_train_sample(sample)]
         return samples
 

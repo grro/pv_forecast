@@ -1,19 +1,26 @@
 import logging
 import pytz
-from dataclasses import dataclass
 from datetime import datetime
 from pvpower.mosmix import MosmixSWeb
 from typing import Optional
 
 
-@dataclass(frozen=True)
+
 class WeatherForecast:
-    time: datetime
-    irradiance: int
-    sunshine: int
-    cloud_cover: int
-    probability_for_fog: int
-    visibility: int
+
+    def __init__(self,
+                 time: datetime,
+                 irradiance: int,
+                 sunshine: int,
+                 cloud_cover: int,
+                 probability_for_fog: int,
+                 visibility: int):
+        self.utc_time = time.astimezone(pytz.UTC)
+        self.irradiance = irradiance
+        self.sunshine = sunshine
+        self.cloud_cover = cloud_cover
+        self.probability_for_fog = probability_for_fog
+        self.visibility = visibility
 
     def with_time(self, dt: datetime):
         return WeatherForecast(dt,
@@ -24,7 +31,7 @@ class WeatherForecast:
                                self.visibility)
 
     def is_valid(self):
-        return self.time is not None and \
+        return self.utc_time is not None and \
                self.irradiance is not None and \
                self.sunshine is not None and \
                self.cloud_cover is not None and \
@@ -32,7 +39,7 @@ class WeatherForecast:
                self.visibility is not None
 
     def __str__(self):
-        return self.time.astimezone(pytz.UTC).strftime("%Y.%m.%d %H:%M") + " utc" + \
+        return self.utc_time.strftime("%Y.%m.%d %H:%M") + " utc" + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
                ", cloud_cover=" + str(round(self.cloud_cover)) + \
