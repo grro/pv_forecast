@@ -125,7 +125,7 @@ class VectorizerTester:
             "+sunshine": PlusSunshineVectorizer(),
             "+cloudcover": PlusCloudCoverVectorizer(),
             "+fog": PlusFogVectorizer(),
-            "+visibility +sunsine": PlusVisibilitySunshineVectorizer(),
+            "+visibility +sunshine": PlusVisibilitySunshineVectorizer(),
             "+visibility +cloudcover": PlusVisibilityCloudCoverVectorizer(),
             "+visibility +fog": PlusVisibilityFogVectorizer(),
             "+visibility +fog +cloudcover": PlusVisibilityFogCloudCoverVectorizer(),

@@ -38,10 +38,10 @@ class ValueRecorder:
 
 class PvPowerForecast:
 
-    def __init__(self, station_id: str, train_dir: str = None):
+    def __init__(self, station_id: str, train_dir: str = None, mosmix_cache_filemame: str = None):
         if train_dir is None:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
-        self.weather_forecast_service = WeatherStation(station_id)
+        self.weather_forecast_service = WeatherStation(station_id, mosmix_cache_filemame)
         self.train_log = TrainSampleLog(train_dir)
         self.__train_value_recorder = ValueRecorder()
         self.__estimator = Estimator()

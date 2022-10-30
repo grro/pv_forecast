@@ -2,7 +2,7 @@ import logging
 import pytz
 from dataclasses import dataclass
 from datetime import datetime
-from pvpower.mosmix import MosmixS
+from pvpower.mosmix import MosmixSWeb
 from typing import Optional
 
 
@@ -42,19 +42,18 @@ class WeatherForecast:
 
 class WeatherStation:
 
-    def __init__(self, station: str):
+    def __init__(self, station: str, mosmix_cache_filemame: str = None):
         self.__station = station
-        self.__mosmixs = MosmixS.load(self.__station)
+        self.__mosmix_cache_filemame = mosmix_cache_filemame
+        self.__mosmixs = MosmixSWeb.load(self.__station, self.__mosmix_cache_filemame)
         self.__previous_mosmixs = self.__mosmixs
 
     def __refresh(self):
-        mosmixs = MosmixS.load(self.__station)
+        mosmixs = MosmixSWeb.load(self.__station, self.__mosmix_cache_filemame)
         if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():
-            logging.info("updated mosmix file loaded ")
+            logging.info("updated mosmix file loaded")
             self.__previous_mosmixs = self.__mosmixs
             self.__mosmixs = mosmixs
-        else:
-            logging.info("loaded mosmix file is unchanged. ignoring it")
 
     def forcast_from(self) -> datetime:
         return self.__previous_mosmixs.data_from()
@@ -62,13 +61,10 @@ class WeatherStation:
     def forcast_to(self) -> datetime:
         return self.__mosmixs.data_to()
 
-    def __mosmix_is_expired(self) -> bool:
-        return self.__mosmixs.content_age_sec() > (90*60) and self.__mosmixs.elapsed_sec_fetched() > (15*60)
-
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()
 
-        if self.__mosmix_is_expired():
+        if self.__mosmixs.is_expired():
             self.__refresh()
 
         if self.__mosmixs.supports(time):
