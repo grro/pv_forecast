@@ -186,7 +186,10 @@ class MosmixSWeb:
 
     @staticmethod
     def load(station_id: str):
-        cache_filename = os.path.join(site_data_dir("pv_forecast", appauthor=False), "mosmixs_" + station_id + ".json")
+        dir = site_data_dir("pv_forecast", appauthor=False)
+        if not exists(dir):
+            os.makedirs(dir)
+        cache_filename = os.path.join(dir, "mosmixs_" + station_id + ".json")
         mosmix = MosmixS.load(cache_filename)
         if mosmix is not None and not mosmix.is_expired():
             return mosmix
