@@ -1,8 +1,11 @@
+import os.path
+
 import httpx
 import json
 from stream_unzip import stream_unzip
 from typing import Dict
 import pytz
+from appdirs import site_data_dir
 from os.path import exists
 from datetime import datetime, timezone
 from typing import List
@@ -184,11 +187,12 @@ class MosmixSWeb:
             yield from r.iter_bytes(chunk_size=65536)
 
     @staticmethod
-    def load(station_id: str, cache_filemame: str = None):
-        if cache_filemame is not None:
-            mosmix = MosmixS.load(cache_filemame)
-            if mosmix is not None and not mosmix.is_expired():
-                return mosmix
+    def load(station_id: str):
+        cache_filename = os.path.join(site_data_dir("pv_forecast", appauthor=False), "mosmixs_" + station_id + ".json")
+        mosmix = MosmixS.load(cache_filename)
+        if mosmix is not None and not mosmix.is_expired():
+            return mosmix
+
         url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'
         mosmix_loader = MosmixSWeb(station_id)
         xml_parser = ET.XMLPullParser(['start', 'end'])
@@ -202,8 +206,8 @@ class MosmixSWeb:
                          mosmix_loader.__timesteps_collector.utc_timesteps,
                          mosmix_loader.__forecasts_collector.parameters)
 
-        if cache_filemame is not None:
-            mosmix.save(cache_filemame)
+        if cache_filename is not None:
+            mosmix.save(cache_filename)
         return mosmix
 
 

@@ -42,14 +42,13 @@ class WeatherForecast:
 
 class WeatherStation:
 
-    def __init__(self, station: str, mosmix_cache_filemame: str = None):
+    def __init__(self, station: str, ):
         self.__station = station
-        self.__mosmix_cache_filemame = mosmix_cache_filemame
-        self.__mosmixs = MosmixSWeb.load(self.__station, self.__mosmix_cache_filemame)
+        self.__mosmixs = MosmixSWeb.load(self.__station)
         self.__previous_mosmixs = self.__mosmixs
 
     def __refresh(self):
-        mosmixs = MosmixSWeb.load(self.__station, self.__mosmix_cache_filemame)
+        mosmixs = MosmixSWeb.load(self.__station)
         if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():
             logging.info("updated mosmix file loaded")
             self.__previous_mosmixs = self.__mosmixs
