@@ -78,13 +78,14 @@ class ForecastValuesCollector:
             self.__is_placemark_collecting = False
 
 
-class ParameterSeries:
+class ParameterUtcSeries:
 
-    def __init__(self, name: str, utc_time_series: List[datetime], values: Dict[str, List[float]]):
+    def __init__(self, name: str, time_series: List[datetime], values: Dict[str, List[float]]):
         self.name = name
-        self.series = { utc_time_series[i].strftime("%d.%m.%Y %H"): values[name][i] for i in range(0, len(utc_time_series)) }
+        self.__series = { time_series[i].astimezone(pytz.UTC).strftime("%d.%m.%Y %H"): values[name][i] for i in range(0, len(time_series)) }
 
-
+    def value_at(self, dt: datetime):
+        return self.__series.get(dt.astimezone(pytz.UTC).strftime("%d.%m.%Y %H"))
 
 
 class MosmixS:
@@ -98,7 +99,7 @@ class MosmixS:
         self.issue_time_utc = issue_time_utc
         self.__utc_timesteps = utc_timesteps
         self.__parameters = parameters
-        self.__parameter_series = {}
+        self.__parameter_series: Dict[str, ParameterUtcSeries] = {}
 
     def is_expired(self) -> bool:
         content_age_sec = int((datetime.now(timezone.utc) - self.issue_time_utc).total_seconds())
@@ -115,11 +116,8 @@ class MosmixS:
 
     def __read(self, parameter: str, dt: datetime) -> float:
         if parameter not in self.__parameter_series.keys():
-            self.__parameter_series[parameter] = ParameterSeries(parameter, self.__utc_timesteps, self.__parameters).series
-        utc_time = dt.astimezone(pytz.UTC)
-        value = self.__parameter_series.get(parameter).get(utc_time.strftime("%d.%m.%Y %H"))
-        #logging.debug("got " + str(value) + " for requested time " + dt.isoformat() + " (utc: " + utc_time.isoformat() + ")")
-        return value
+            self.__parameter_series[parameter] = ParameterUtcSeries(parameter, self.__utc_timesteps, self.__parameters)
+        return self.__parameter_series.get(parameter).value_at(dt)
 
     def rad1h(self, dt: datetime) -> float:
         return self.__read("Rad1h", dt)

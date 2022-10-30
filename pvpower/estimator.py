@@ -30,20 +30,20 @@ class Vectorizer(ABC):
         pass
 
 
-class SimpleVectorizer(Vectorizer):
+class FullVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        window_minutes = 15
         vectorized = [self._scale(sample.time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time)/window_minutes), int((24*60)/window_minutes)),
+                      self._scale(int(self._utc_minutes_of_day(sample.time)/10), int((24*60)/10)),
                       self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000)]
-        logging.debug(sample.time.astimezone(pytz.UTC).strftime("%b %H:%M") + " utc;irradiance=" + str(sample.irradiance)+ ";visibility=" + str(sample.visibility) + "   ->   " + str(vectorized))
+                      self._scale(sample.visibility, 50000),
+                      self._scale(sample.probability_for_fog, 100),
+                      self._scale(sample.cloud_cover, 100),
+                      self._scale(sample.sunshine, 5000)]
         return vectorized
 
     def __str__(self):
-        return "SimpleVectorizer(month,fifteenthMinuteOfDay,irradiance,visibility)"
-
+        return "SimpleVectorizer(month,fifteenthMinuteOfDay,irradiance,visibility,probability_for_fog,cloud_cover,sunshine)"
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class Estimator:
         else:
             self.__clf = classifier
         if vectorizer is None:
-            self.__vectorizer = SimpleVectorizer()
+            self.__vectorizer = FullVectorizer()
         else:
             self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
