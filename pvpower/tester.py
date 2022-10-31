@@ -81,7 +81,7 @@ class Tester:
             step_width = 1
         for i in range(0, rounds):
             # split test data
-            num_train_samples = int(len(samples) * 0.7)
+            num_train_samples = int(len(samples) * 0.65)
             train_samples = samples[0: num_train_samples]
             validation_samples = samples[num_train_samples:]
 

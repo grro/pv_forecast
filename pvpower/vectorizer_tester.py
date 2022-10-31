@@ -118,7 +118,7 @@ class VectorizerTester:
 
     def __init__(self, train_dir: str = None):
         trainlog = TrainSampleLog(train_dir)
-        self.__samples = trainlog.all()
+        self.__samples = Estimator().clean_data(trainlog.all())
         self.__vectorizer_map = {
             "core": CoreVectorizer(),
             "+visibility": PlusVisibilityVectorizer(),
@@ -132,10 +132,9 @@ class VectorizerTester:
             "+visibility +fog +cloudcover +sunshine": AllVectorizer(),
         }
 
-    def report(self) -> str:
-        num_rounds = 10
+    def report(self, num_rounds: int = 10) -> str:
         days = len(set([sample.utc_time.strftime("%Y.%m.%d")  for sample in self.__samples]))
-        report = "tested with " + str(len(self.__samples)) + " samples (" + str(days) + " days; " + str(num_rounds) + " rounds per config)" + "\n"
+        report = "tested with " + str(len(self.__samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
         report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
         for variant in self.__vectorizer_map.keys():
             test_reports = Tester(self.__samples).evaluate(Estimator(vectorizer=self.__vectorizer_map[variant]), rounds=num_rounds)
