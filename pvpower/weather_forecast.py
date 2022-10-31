@@ -51,44 +51,35 @@ class WeatherStation:
 
     def __init__(self, station: str, ):
         self.__station = station
-        self.__mosmixs = MosmixSWeb.load(self.__station)
-        self.__previous_mosmixs = self.__mosmixs
-
-    def __refresh(self):
-        mosmixs = MosmixSWeb.load(self.__station)
-        if mosmixs.utc_date_from() > self.__mosmixs.utc_date_from():
-            logging.info("updated mosmix file loaded")
-            self.__previous_mosmixs = self.__mosmixs
-            self.__mosmixs = mosmixs
+        self.__mosmix = MosmixSWeb.load(self.__station)
 
     def forcast_from(self) -> datetime:
-        return self.__previous_mosmixs.data_from()
+        return self.__mosmix.utc_date_from
 
     def forcast_to(self) -> datetime:
-        return self.__mosmixs.data_to()
+        return self.__mosmix.utc_date_to
 
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()
 
-        if self.__mosmixs.is_expired():
-            self.__refresh()
+        if self.__mosmix.is_expired():
+            mosmix = MosmixSWeb.load(self.__station)
+            if mosmix.utc_date_from > self.__mosmix.utc_date_from:
+                logging.info("updated mosmix file loaded")
+                self.__mosmix = mosmix
 
-        if self.__mosmixs.supports(time):
-            mosmixs = self.__mosmixs
-        elif self.__previous_mosmixs.supports(time):
-            mosmixs = self.__previous_mosmixs
+        if self.__mosmix.supports(time):
+            forecast = WeatherForecast(time,
+                                       int(self.__mosmix.rad1h(time)),
+                                       int(self.__mosmix.sund1(time)),
+                                       int(self.__mosmix.neff(time)),
+                                       int(self.__mosmix.wwm(time)),
+                                       int(self.__mosmix.vv(time)))
+            if forecast.is_valid():
+                return forecast
+            else:
+                logging.info("available weather reacord is incomplete. Returning None " + str(forecast))
+                return None
         else:
+            logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None")
             return None
-
-        forecast = WeatherForecast(time,
-                                   int(mosmixs.rad1h(time)),
-                                   int(mosmixs.sund1(time)),
-                                   int(mosmixs.neff(time)),
-                                   int(mosmixs.wwm(time)),
-                                   int(mosmixs.vv(time)))
-        if forecast.is_valid():
-            return forecast
-        else:
-            logging.info("available weather sample is incomplete. Returning None " + str(forecast))
-            return None
-

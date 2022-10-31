@@ -43,7 +43,7 @@ class FullVectorizer(Vectorizer):
         return vectorized
 
     def __str__(self):
-        return "SimpleVectorizer(month,fifteenthMinuteOfDay,irradiance,visibility,probability_for_fog,cloud_cover,sunshine)"
+        return "FullVectorizer"
 
 
 @dataclass(frozen=True)

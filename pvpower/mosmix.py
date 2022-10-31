@@ -1,14 +1,14 @@
+import logging
 import os.path
-
 import httpx
 import json
 from stream_unzip import stream_unzip
-from typing import Dict
+from random import randrange
 import pytz
 from appdirs import site_data_dir
 from os.path import exists
-from datetime import datetime, timezone
-from typing import List
+from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Any
 import xml.etree.ElementTree as ET
 
 
@@ -80,87 +80,129 @@ class ForecastValuesCollector:
 
 class ParameterUtcSeries:
 
-    def __init__(self, name: str, time_series: List[datetime], values: Dict[str, List[float]]):
+    def __init__(self, name: str, series: Dict[str, float]):
         self.name = name
-        self.__series = { time_series[i].astimezone(pytz.UTC).strftime("%d.%m.%Y %H"): values[name][i] for i in range(0, len(time_series)) }
+        self.__series = series
 
-    def value_at(self, dt: datetime):
-        return self.__series.get(dt.astimezone(pytz.UTC).strftime("%d.%m.%Y %H"))
+    def size(self) -> int:
+        return len(self.__series.keys())
+
+    def value_at(self, dt: datetime) -> float:
+        return self.__series.get(dt.astimezone(pytz.UTC).strftime("%Y.%m.%d %H"))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return { "name": self.name,
+                 "series": self.__series }
+
+    def merge(self, other, min_datetime: datetime):
+        yesterday = min_datetime.astimezone(pytz.UTC).strftime("%Y.%m.%d %H")
+        merged_series = {}
+        for time in other.__series.keys():
+            if time >= yesterday:
+                merged_series[time] = other.__series[time]
+        merged_series.update(self.__series)
+        return ParameterUtcSeries(self.name, merged_series)
+
+    @staticmethod
+    def create(name: str, time_series: List[datetime], values: Dict[str, List[float]]):
+        return ParameterUtcSeries(name, {time_series[i].astimezone(pytz.UTC).strftime("%Y.%m.%d %H"): values[name][i] for i in range(0, len(time_series))})
+
+    @staticmethod
+    def from_dict(map: Dict[str, Any]):
+        return ParameterUtcSeries(map['name'], map['series'])
 
 
 class MosmixS:
 
+    @staticmethod
+    def create(station_id: str,
+               issue_time_utc: datetime,
+               utc_timesteps: List[datetime],
+               parameters: Dict[str, List[float]]):
+        return MosmixS(station_id,
+                       issue_time_utc,
+                       utc_timesteps[0],
+                       utc_timesteps[-1],
+                       {parameter: ParameterUtcSeries.create(parameter, utc_timesteps, parameters) for parameter in parameters})
+
     def __init__(self,
                  station_id: str,
                  issue_time_utc: datetime,
-                 utc_timesteps: List[datetime],
-                 parameters: Dict[str, List[float]]):
+                 utc_date_from: datetime,
+                 utc_date_to: datetime,
+                 parameter_series: Dict[str, ParameterUtcSeries]):
         self.station_id = station_id
         self.issue_time_utc = issue_time_utc
-        self.__utc_timesteps = utc_timesteps
-        self.__parameters = parameters
-        self.__parameter_series: Dict[str, ParameterUtcSeries] = {}
+        self.utc_date_from = utc_date_from
+        self.utc_date_to = utc_date_to
+        self.__parameter_series = parameter_series
+
+    def merge(self, old_mosmix, min_datetime: datetime):
+        if old_mosmix is None:
+            return self
+        else:
+            merged = MosmixS(self.station_id,
+                             self.issue_time_utc,
+                             old_mosmix.utc_date_from,
+                             self.utc_date_to,
+                             {parameter: self.__parameter_series[parameter].merge(old_mosmix.__parameter_series[parameter], min_datetime) for parameter in self.__parameter_series.keys()} )
+            logging.debug("merging \nold mosmix: " + str(old_mosmix) + " \nnew mosmix: " + str(self) + " \n-> " + str(merged))
+            return merged
 
     def is_expired(self) -> bool:
         content_age_sec = int((datetime.now(timezone.utc) - self.issue_time_utc).total_seconds())
-        return content_age_sec > (90*60)
-
-    def utc_date_from(self) -> datetime:
-        return self.__utc_timesteps[0]
-
-    def utc_date_to(self) -> datetime:
-        return self.__utc_timesteps[-1]
+        return content_age_sec > (60*60 + 25*60 + randrange(15)*60)
 
     def supports(self, dt: datetime) -> bool:
-        return self.utc_date_from() <= dt.astimezone(pytz.UTC) <= self.utc_date_to()
-
-    def __read(self, parameter: str, dt: datetime) -> float:
-        if parameter not in self.__parameter_series.keys():
-            self.__parameter_series[parameter] = ParameterUtcSeries(parameter, self.__utc_timesteps, self.__parameters)
-        return self.__parameter_series.get(parameter).value_at(dt)
+        return self.utc_date_from <= dt.astimezone(pytz.UTC) <= self.utc_date_to
 
     def rad1h(self, dt: datetime) -> float:
-        return self.__read("Rad1h", dt)
+        return self.__parameter_series["Rad1h"].value_at(dt)
 
     def sund1(self, dt: datetime) -> float:
-        return self.__read("SunD1", dt)
+        return self.__parameter_series["SunD1"].value_at(dt)
 
     def neff(self, dt: datetime) -> float:
-        return self.__read("Neff", dt)
+        return self.__parameter_series["Neff"].value_at(dt)
 
     def wwm(self, dt: datetime) -> float:
-        return self.__read("wwM", dt)
+        return self.__parameter_series["wwM"].value_at(dt)
 
     def vv(self, dt: datetime) -> float:
-        return self.__read("VV", dt)
+        return self.__parameter_series["VV"].value_at(dt)
 
     def __str__(self):
-        return self.utc_date_from().strftime("%d.%m.%Y %H:%M") + " utc -> " + self.utc_date_to().strftime("%d.%m.%Y %H:%M") + " utc"
+        return "issued=" + self.issue_time_utc.strftime("%d.%m.%Y %H:%M") + "/" + str(self.__parameter_series["Rad1h"].size()) + " entries " + self.utc_date_from.strftime("%d.%m.%Y %H:%M") + " utc -> " + self.utc_date_to.strftime("%d.%m.%Y %H:%M") + " utc"
 
     def save(self, filename: str = "mosmix.json"):
         with open(filename, "w") as file:
             data = json.dumps({ "station_id": self.station_id,
                                 "issue_time_utc": self.issue_time_utc.isoformat(),
-                                "utc_timesteps": [time.isoformat() for time in self.__utc_timesteps],
-                                "parameters": self.__parameters
-                                })
+                                "utc_date_from": self.utc_date_from.isoformat(),
+                                "utc_date_to": self.utc_date_to.isoformat(),
+                                "parameter_series": { parameter: self.__parameter_series[parameter].to_dict() for parameter in self.__parameter_series.keys()}})
             file.write(data)
 
     @staticmethod
     def load(filename: str = "mosmix.json"):
         if exists(filename):
             with open(filename, "r") as file:
-                data = json.loads(file.read())
-                station_id = data['station_id']
-                issue_time_utc = datetime.fromisoformat(data['issue_time_utc'])
-                utc_timesteps = [datetime.fromisoformat(time) for time in data['utc_timesteps']]
-                parameters = data['parameters']
-                return MosmixS(station_id,
-                               issue_time_utc,
-                               utc_timesteps,
-                               parameters)
-        else:
-            return None
+                try:
+                    data = json.loads(file.read())
+                    station_id = data['station_id']
+                    issue_time_utc = datetime.fromisoformat(data['issue_time_utc'])
+                    utc_date_from = datetime.fromisoformat(data['utc_date_from'])
+                    utc_date_to = datetime.fromisoformat(data['utc_date_to'])
+                    parameter_series = {parameter: ParameterUtcSeries.from_dict(data['parameter_series'][parameter]) for parameter in data['parameter_series'].keys()}
+                    return MosmixS(station_id,
+                                   issue_time_utc,
+                                   utc_date_from,
+                                   utc_date_to,
+                                   parameter_series)
+                except Exception as e:
+                    logging.warning("error occurred loading mosmix cache file " + filename, e)
+        return None
+
 
 class MosmixSWeb:
 
@@ -185,15 +227,21 @@ class MosmixSWeb:
             yield from r.iter_bytes(chunk_size=65536)
 
     @staticmethod
-    def load(station_id: str):
+    def __cachedir() -> str:
         dir = site_data_dir("pv_forecast", appauthor=False)
         if not exists(dir):
             os.makedirs(dir)
-        cache_filename = os.path.join(dir, "mosmixs_" + station_id + ".json")
-        mosmix = MosmixS.load(cache_filename)
-        if mosmix is not None and not mosmix.is_expired():
-            return mosmix
+        return dir
 
+    @staticmethod
+    def load(station_id: str):
+        # load cached mosmix
+        cache_filename = os.path.join(MosmixSWeb.__cachedir(), "mosmixs_" + station_id + ".json")
+        cached_mosmix = MosmixS.load(cache_filename)
+        if cached_mosmix is not None and not cached_mosmix.is_expired():
+            return cached_mosmix
+
+        # cached mosmix is expired
         url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'
         mosmix_loader = MosmixSWeb(station_id)
         xml_parser = ET.XMLPullParser(['start', 'end'])
@@ -202,13 +250,13 @@ class MosmixSWeb:
                 xml_parser.feed(chunk)
                 for event, elem in xml_parser.read_events():
                     mosmix_loader.consume(event, elem)
-        mosmix = MosmixS(station_id,
-                         mosmix_loader.__issue_time_collector.issue_time_utc,
-                         mosmix_loader.__timesteps_collector.utc_timesteps,
-                         mosmix_loader.__forecasts_collector.parameters)
+        mosmix = MosmixS.create(station_id,
+                                mosmix_loader.__issue_time_collector.issue_time_utc,
+                                mosmix_loader.__timesteps_collector.utc_timesteps,
+                                mosmix_loader.__forecasts_collector.parameters)
 
-        if cache_filename is not None:
-            mosmix.save(cache_filename)
+        mosmix = mosmix.merge(cached_mosmix, datetime.now() - timedelta(days=1))
+        mosmix.save(cache_filename)
         return mosmix
 
 
