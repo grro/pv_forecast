@@ -133,11 +133,12 @@ class VectorizerTester:
         }
 
     def report(self) -> str:
+        num_rounds = 10
         days = len(set([sample.utc_time.strftime("%Y.%m.%d")  for sample in self.__samples]))
-        report = "tested with " + str(len(self.__samples)) + " samples (" + str(days) + " days)" + "\n"
+        report = "tested with " + str(len(self.__samples)) + " samples (" + str(days) + " days; " + str(num_rounds) + " rounds per config)" + "\n"
         report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
         for variant in self.__vectorizer_map.keys():
-            test_reports = Tester(self.__samples).evaluate(Estimator(vectorizer=self.__vectorizer_map[variant]))
+            test_reports = Tester(self.__samples).evaluate(Estimator(vectorizer=self.__vectorizer_map[variant]), rounds=num_rounds)
             median_report = test_reports[int(len(test_reports)*0.5)]
             score = str(round(median_report.score))
             distribution = str(round(test_reports[0].score)) + ", " + str(round(test_reports[1].score)) + ", " + str(round(test_reports[2].score)) + ", " + str(round(test_reports[3].score)) + ", ..., " + str(round(test_reports[int(len(test_reports)*0.5)].score)) + ", ..., " + str(round(test_reports[-4].score)) + ", " + str(round(test_reports[-3].score)) + ", " + str(round(test_reports[-2].score)) + ", " + str(round(test_reports[-1].score))
@@ -145,5 +146,3 @@ class VectorizerTester:
             logging.info("variant " + variant + " analyzed")
         return report
 
-
-print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
