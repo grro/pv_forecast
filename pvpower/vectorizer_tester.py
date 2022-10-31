@@ -146,4 +146,4 @@ class VectorizerTester:
         return report
 
 
-#print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())
+print(VectorizerTester('C:\workspace\pv_forecast\pvpower').report())

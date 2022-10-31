@@ -72,10 +72,14 @@ class Tester:
     def __init__(self, samples: List[LabelledWeatherForecast]):
         self.__samples = samples
 
-    def evaluate(self, estimator: Estimator) -> List[TestReport]:
+    def evaluate(self, estimator: Estimator, rounds: int = 10) -> List[TestReport]:
         test_reports = []
         samples = estimator.clean_data(self.__samples)
-        for i in range(0, len(samples)):
+
+        step_width = int(len(samples) / rounds)
+        if step_width < 1:
+            step_width = 1
+        for i in range(0, rounds):
             # split test data
             num_train_samples = int(len(samples) * 0.7)
             train_samples = samples[0: num_train_samples]
@@ -86,7 +90,7 @@ class Tester:
             predicted = [estimator.predict(test_sample) for test_sample in validation_samples]
             test_reports.append(TestReport(train_report, validation_samples, predicted))
 
-            samples = samples[-1:] + samples[:-1]
+            samples = samples[-step_width:] + samples[:-step_width]
 
         test_reports.sort(key=lambda report: report.score)
         return test_reports
