@@ -6,6 +6,10 @@ from typing import Optional
 
 
 
+def utc_to_local(utc: datetime) -> datetime:
+    return utc + (datetime.now() - datetime.utcnow())
+
+
 class WeatherForecast:
 
     def __init__(self,
@@ -15,7 +19,7 @@ class WeatherForecast:
                  cloud_cover: int,
                  probability_for_fog: int,
                  visibility: int):
-        self.utc_time = time.astimezone(pytz.UTC)
+        self.time_utc = time.astimezone(pytz.UTC)
         self.irradiance = irradiance
         self.sunshine = sunshine
         self.cloud_cover = cloud_cover
@@ -31,7 +35,7 @@ class WeatherForecast:
                                self.visibility)
 
     def is_valid(self):
-        return self.utc_time is not None and \
+        return self.time_utc is not None and \
                self.irradiance is not None and \
                self.sunshine is not None and \
                self.cloud_cover is not None and \
@@ -39,7 +43,7 @@ class WeatherForecast:
                self.visibility is not None
 
     def __str__(self):
-        return self.utc_time.strftime("%Y.%m.%d %H:%M") + " utc" + \
+        return self.time_utc.strftime("%Y.%m.%d %H:%M") + " utc" + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
                ", cloud_cover=" + str(round(self.cloud_cover)) + \
@@ -54,10 +58,10 @@ class WeatherStation:
         self.__mosmix = MosmixSWeb.load(self.__station)
 
     def forcast_from(self) -> datetime:
-        return self.__mosmix.utc_date_from
+        return utc_to_local(self.__mosmix.utc_date_from)
 
     def forcast_to(self) -> datetime:
-        return self.__mosmix.utc_date_to
+        return utc_to_local(self.__mosmix.utc_date_to)
 
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()

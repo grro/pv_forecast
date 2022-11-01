@@ -9,8 +9,8 @@ from pvpower.tester import Tester
 class CoreVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000)]
         return vectorized
 
@@ -18,8 +18,8 @@ class CoreVectorizer(Vectorizer):
 class PlusVisibilityVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000)]
         return vectorized
@@ -28,8 +28,8 @@ class PlusVisibilityVectorizer(Vectorizer):
 class PlusSunshineVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.sunshine, 5000)]
         return vectorized
@@ -38,8 +38,8 @@ class PlusSunshineVectorizer(Vectorizer):
 class PlusCloudCoverVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.cloud_cover, 200)]
         return vectorized
@@ -48,8 +48,8 @@ class PlusCloudCoverVectorizer(Vectorizer):
 class PlusFogVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.probability_for_fog, 100)]
         return vectorized
@@ -58,8 +58,8 @@ class PlusFogVectorizer(Vectorizer):
 class PlusVisibilitySunshineVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.sunshine, 5000)]
@@ -69,8 +69,8 @@ class PlusVisibilitySunshineVectorizer(Vectorizer):
 class PlusVisibilityCloudCoverVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.cloud_cover, 200)]
@@ -80,8 +80,8 @@ class PlusVisibilityCloudCoverVectorizer(Vectorizer):
 class PlusVisibilityFogVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.probability_for_fog, 100)]
@@ -92,8 +92,8 @@ class PlusVisibilityFogVectorizer(Vectorizer):
 class PlusVisibilityFogCloudCoverVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.probability_for_fog, 100),
@@ -104,8 +104,8 @@ class PlusVisibilityFogCloudCoverVectorizer(Vectorizer):
 class AllVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.utc_time.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.utc_time)/10), int((24*60)/10)),
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
                       self._scale(sample.irradiance, 1000),
                       self._scale(sample.visibility, 50000),
                       self._scale(sample.probability_for_fog, 100),
@@ -133,7 +133,7 @@ class VectorizerTester:
         }
 
     def report(self, num_rounds: int = 10) -> str:
-        days = len(set([sample.utc_time.strftime("%Y.%m.%d")  for sample in self.__samples]))
+        days = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in self.__samples]))
         report = "tested with " + str(len(self.__samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
         report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
         for variant in self.__vectorizer_map.keys():

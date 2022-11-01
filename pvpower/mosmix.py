@@ -82,24 +82,26 @@ class ParameterUtcSeries:
 
     def __init__(self, name: str, series: Dict[str, float]):
         self.name = name
-        self.__series = series
+        self.__series = series   # time_utc: value
 
     def size(self) -> int:
         return len(self.__series.keys())
 
     def value_at(self, dt: datetime) -> float:
-        return self.__series.get(dt.astimezone(pytz.UTC).strftime("%Y.%m.%d %H"))
+        dt_utc = dt.astimezone(pytz.UTC)
+        return self.__series.get(dt_utc.strftime("%Y.%m.%d %H"))
 
     def to_dict(self) -> Dict[str, Any]:
         return { "name": self.name,
                  "series": self.__series }
 
     def merge(self, other, min_datetime: datetime):
-        yesterday = min_datetime.astimezone(pytz.UTC).strftime("%Y.%m.%d %H")
+        min_datetime_utc = min_datetime.astimezone(pytz.UTC)
+        min_datetime_utc_str = min_datetime_utc.strftime("%Y.%m.%d %H")
         merged_series = {}
-        for time in other.__series.keys():
-            if time >= yesterday:
-                merged_series[time] = other.__series[time]
+        for time_utc in other.__series.keys():
+            if time_utc >= min_datetime_utc_str:
+                merged_series[time_utc] = other.__series[time_utc]
         merged_series.update(self.__series)
         return ParameterUtcSeries(self.name, merged_series)
 
@@ -117,24 +119,24 @@ class MosmixS:
     @staticmethod
     def create(station_id: str,
                issue_time_utc: datetime,
-               utc_timesteps: List[datetime],
+               timesteps_utc: List[datetime],
                parameters: Dict[str, List[float]]):
         return MosmixS(station_id,
                        issue_time_utc,
-                       utc_timesteps[0],
-                       utc_timesteps[-1],
-                       {parameter: ParameterUtcSeries.create(parameter, utc_timesteps, parameters) for parameter in parameters})
+                       timesteps_utc[0],
+                       timesteps_utc[-1],
+                       {parameter: ParameterUtcSeries.create(parameter, timesteps_utc, parameters) for parameter in parameters})
 
     def __init__(self,
                  station_id: str,
                  issue_time_utc: datetime,
-                 utc_date_from: datetime,
-                 utc_date_to: datetime,
+                 date_from_utc: datetime,
+                 date_to_utc: datetime,
                  parameter_series: Dict[str, ParameterUtcSeries]):
         self.station_id = station_id
         self.issue_time_utc = issue_time_utc
-        self.utc_date_from = utc_date_from
-        self.utc_date_to = utc_date_to
+        self.utc_date_from = date_from_utc
+        self.utc_date_to = date_to_utc
         self.__parameter_series = parameter_series
 
     def merge(self, old_mosmix, min_datetime: datetime):
@@ -154,7 +156,8 @@ class MosmixS:
         return content_age_sec > (60*60 + 25*60 + randrange(15)*60)
 
     def supports(self, dt: datetime) -> bool:
-        return self.utc_date_from <= dt.astimezone(pytz.UTC) <= self.utc_date_to
+        dt_utc = dt.astimezone(pytz.UTC)
+        return self.utc_date_from <= dt_utc <= self.utc_date_to
 
     def rad1h(self, dt: datetime) -> float:
         return self.__parameter_series["Rad1h"].value_at(dt)

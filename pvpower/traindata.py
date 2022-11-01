@@ -11,7 +11,6 @@ from os.path import exists
 from threading import RLock
 from datetime import datetime, timedelta
 from typing import List, Optional
-from dataclasses import dataclass
 from pvpower.weather_forecast import WeatherForecast
 
 
@@ -32,7 +31,7 @@ class LabelledWeatherForecast(WeatherForecast):
     @staticmethod
     def create(weather_forecast: WeatherForecast, power_watt: int, time: datetime = None):
 
-        return LabelledWeatherForecast(weather_forecast.utc_time if time is None else time,
+        return LabelledWeatherForecast(weather_forecast.time_utc if time is None else time,
                                        weather_forecast.irradiance,
                                        weather_forecast.sunshine,
                                        weather_forecast.cloud_cover,
@@ -45,7 +44,7 @@ class LabelledWeatherForecast(WeatherForecast):
         return "" if value is None else str(value)
 
     def to_csv(self) -> str:
-        utc_time = self.utc_time
+        utc_time = self.time_utc
         return utc_time.strftime("%d.%m.%Y %H:%M") + ";" + \
                LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
                LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
@@ -166,10 +165,10 @@ class TrainSampleLog:
                 num_survived = 0
                 previous_sample = None
                 for sample in samples:
-                    expired = sample.utc_time < min_datetime.astimezone(pytz.UTC)
+                    expired = sample.time_utc < min_datetime.astimezone(pytz.UTC)
                     duplicate = False
                     if previous_sample is not None:
-                        duplicate = previous_sample.utc_time == sample.utc_time
+                        duplicate = previous_sample.time_utc == sample.time_utc
                     previous_sample = sample
                     if not expired and not duplicate:
                         num_survived += 1
