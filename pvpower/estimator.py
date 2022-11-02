@@ -153,11 +153,8 @@ class Estimator:
         # it seems that the SVM approach produces good predictions
         # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
         self.__clf = svm.SVC(kernel='poly')
-
         self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
-        # initialize with dummy data
-        self.retrain([LabelledWeatherForecast(datetime.now(), 1, 0, 0, 0, 0, 0), LabelledWeatherForecast(datetime.now() - timedelta(days=1), 1, 0, 0, 0, 0, 1)])
 
     def usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
         return sample.irradiance > 0 \
@@ -180,7 +177,7 @@ class Estimator:
         return TrainReport(cleaned_samples)
 
     def __str__(self):
-        return "Model vectorizer=" + str(self.__vectorizer) + " trained with " + str(self.num_samples_last_train) + " cleaned samples"
+        return "Estimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.num_samples_last_train) + " samples)"
 
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:

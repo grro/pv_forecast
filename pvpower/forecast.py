@@ -45,6 +45,7 @@ class Trainer:
                 best_estimator = estimator
                 lowest_score = median_report.score
         logging.info(report)
+        best_estimator.retrain(samples)
         return best_estimator
 
 
@@ -85,11 +86,10 @@ class PvPowerForecast:
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
         self.__train_value_recorder = ValueRecorder()
+        self.__date_last_retrain = datetime.now() - timedelta(days=90)
+        self.__date_best_estimator_selected = datetime.now() - timedelta(days=90)
         self.__estimator = Estimator(CoreVectorizer())
-        self.__date_last_retrain = datetime.now()
-        self.__date_best_estimator_selected = datetime.now()
         self.__retrain()
-        Thread(target=self.__update_with_best_estimator, daemon=True).start()
 
     def __update_with_best_estimator(self):
         estimator = Trainer().train(self.train_log)
@@ -106,36 +106,10 @@ class PvPowerForecast:
                                                                           self.__train_value_recorder.average,
                                                                           time=self.__train_value_recorder.time)
                         if self.__estimator.usable_as_train_sample(annotated_sample):
-                            self.__on_new_train_sample(annotated_sample)
+                            self.train_log.append(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()
         self.__train_value_recorder.add(real_power)
-
-    def __on_new_train_sample(self, annotated_sample: LabelledWeatherForecast):
-        # add to train log db
-        self.train_log.append(annotated_sample)
-
-        # retrain, if necessary
-        max_retrain_period = 24*60 if (self.__estimator.num_samples_last_train < 5000) else 30*24*60  # 1 day or 1 month
-        if datetime.now() > (self.__date_last_retrain + timedelta(minutes=max_retrain_period)):
-            self.__date_last_retrain = datetime.now()
-            if datetime.now() > (self.__date_best_estimator_selected + timedelta(days=15)):
-                self.__date_best_estimator_selected = datetime.now()
-                Thread(target=self.__update_with_best_estimator, daemon=True).start()
-            else:
-                Thread(target=self.__retrain, daemon=True).start()
-
-    def __retrain(self):
-        try:
-            logging.info("retrain with train log " + self.train_log.filename())
-            samples = self.train_log.all()
-            train_report = self.__estimator.retrain(samples)
-            logging.info("prediction model retrained: " + str(self.__estimator))
-        except Exception as e:
-            logging.warning("error occurred retrain prediction model " + str(e))
-
-    def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
-        return self.__estimator.predict(sample)
 
     def predict(self, time: datetime) -> Optional[int]:
         sample = self.weather_forecast_service.forecast(time)
@@ -149,3 +123,25 @@ class PvPowerForecast:
             predicted_power_watt = self.predict_by_weather_forecast(sample)
             logging.debug("predicted power " + str(predicted_power_watt) + " watt")
             return predicted_power_watt
+
+    def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
+        try:
+            return self.__estimator.predict(sample)
+        finally:
+            # retrain, if necessary
+            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 23 hours
+                self.__date_last_retrain = datetime.now()
+                if datetime.now() > (self.__date_best_estimator_selected + timedelta(days=30)):  # each 1 month
+                    self.__date_best_estimator_selected = datetime.now()
+                    Thread(target=self.__update_with_best_estimator, daemon=True).start()
+                else:
+                    Thread(target=self.__retrain, daemon=True).start()
+
+    def __retrain(self):
+        try:
+            samples = self.train_log.all()
+            self.__estimator.retrain(samples)
+            logging.info("prediction model retrained: " + str(self.__estimator))
+        except Exception as e:
+            logging.warning("error occurred retrain prediction model " + str(e))
+

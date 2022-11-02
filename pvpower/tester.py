@@ -45,7 +45,10 @@ class TestReport:
         values = sorted(list(self.__diff_all()))
         values = values[2:-2]
         abs_values = [abs(value) for value in values]
-        return round(sum(abs_values) / len(abs_values), 2)
+        if abs_values == 0:
+            return 10000
+        else:
+            return round(sum(abs_values) / len(abs_values), 2)
 
     def __repr__(self):
         return self.__str__()
