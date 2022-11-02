@@ -5,11 +5,6 @@ from pvpower.mosmix import MosmixSWeb
 from typing import Optional
 
 
-
-def utc_to_local(utc: datetime) -> datetime:
-    return utc + (datetime.now() - datetime.utcnow())
-
-
 class WeatherForecast:
 
     def __init__(self,
@@ -25,6 +20,13 @@ class WeatherForecast:
         self.cloud_cover = cloud_cover
         self.probability_for_fog = probability_for_fog
         self.visibility = visibility
+
+    def __utc_to_local(self, utc: datetime) -> datetime:
+        return datetime.strptime((utc + (datetime.now() - datetime.utcnow())).strftime("%d.%m.%Y %H:%M:%S.%f"), "%d.%m.%Y %H:%M:%S.%f")
+
+    @property
+    def time(self) -> datetime:
+        return self.__utc_to_local(self.time_utc)
 
     def with_time(self, dt: datetime):
         return WeatherForecast(dt,
@@ -53,22 +55,22 @@ class WeatherForecast:
 
 class WeatherStation:
 
-    def __init__(self, station: str, ):
+    def __init__(self, station: str):
         self.__station = station
         self.__mosmix = MosmixSWeb.load(self.__station)
 
     def forcast_from(self) -> datetime:
-        return utc_to_local(self.__mosmix.utc_date_from)
+        return self.__mosmix.date_from
 
     def forcast_to(self) -> datetime:
-        return utc_to_local(self.__mosmix.utc_date_to)
+        return self.__mosmix.date_to
 
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()
 
         if self.__mosmix.is_expired():
             mosmix = MosmixSWeb.load(self.__station)
-            if mosmix.utc_date_from > self.__mosmix.utc_date_from:
+            if mosmix.date_from_utc > self.__mosmix.date_from_utc:
                 logging.info("updated mosmix file loaded")
                 self.__mosmix = mosmix
 

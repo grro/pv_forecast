@@ -4,10 +4,6 @@ from typing import List, Dict, Optional
 from pvpower.forecast import PvPowerForecast, LabelledWeatherForecast
 
 
-def utc_time_to_local(utc_time) -> datetime:
-    return utc_time + (datetime.now() - datetime.utcnow())
-
-
 
 class TimeFrame:
 
@@ -16,11 +12,11 @@ class TimeFrame:
 
     @property
     def start_time(self) -> datetime:
-        return utc_time_to_local(self.__hourly_forecasts[0].time_utc)
+        return self.__hourly_forecasts[0].time
 
     @property
     def end_time(self) -> datetime:
-        return utc_time_to_local(self.__hourly_forecasts[-1].time_utc + timedelta(minutes=59))
+        return self.__hourly_forecasts[-1].time + timedelta(minutes=59)
 
     @property
     def width_hours(self) -> int:
@@ -75,7 +71,7 @@ class TimeFrames:
         return list(self.__frames)
 
     def __str__(self):
-        txt = "local start time ... local end time .......... pv power total ........... power per hour\n"
+        txt = "start time ......... end time ........... pv power total ........... power per hour\n"
         for frame in sorted(self.__frames, key=lambda frame: frame.start_time, reverse=False):
             power = str(round(frame.power_total))
             power_per_hour = ", ".join([str(round(power)) for power in frame.hourly_power])
@@ -88,22 +84,22 @@ class TimeFrames:
 
 class Next24hours:
 
-    def __init__(self, predictions: Dict[datetime, LabelledWeatherForecast]):
-        self.predictions = predictions
+    def __init__(self, predicted_power: Dict[datetime, LabelledWeatherForecast]):
+        self.predicted_power = predicted_power
 
     @staticmethod
     def of(pv_forecast: PvPowerForecast):
         now = datetime.strptime((datetime.now()).strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
-        predictions = {}
+        predicted_power = {}
         for weather_forecast in [pv_forecast.weather_forecast_service.forecast(prediction_time) for prediction_time in [now + timedelta(hours=i) for i in range(0, 40)]]:
             if weather_forecast is not None:
                 predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
                 if predicted_value is not None:
-                    predictions[weather_forecast.time_utc] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
-        return Next24hours(predictions)
+                    predicted_power[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
+        return Next24hours(predicted_power)
 
     def __prediction_values(self) -> List[int]:
-        return [forecast.power_watt for forecast in self.predictions.values() if forecast.time_utc <= (datetime.now() + timedelta(hours=24)).astimezone(pytz.UTC)]
+        return [forecast.power_watt for forecast in self.predicted_power.values() if forecast.time <= (datetime.now() + timedelta(hours=24))]
 
     def peek(self) -> int:
         return max(self.__prediction_values())
@@ -111,34 +107,34 @@ class Next24hours:
     def peek_time(self) -> datetime:
         peek_time = None
         peek_value = 0
-        for dt in self.predictions.keys():
-            forecast = self.predictions[dt]
+        for dt in self.predicted_power.keys():
+            forecast = self.predicted_power[dt]
             if forecast.power_watt > peek_value:
                 peek_value = forecast.power_watt
                 peek_time = dt
-        return utc_time_to_local(peek_time)
+        return peek_time
 
     def power_total(self) -> int:
         return sum(self.__prediction_values())
 
     def frames(self, width_hours: int = 1) -> TimeFrames:
         frames = []
-        times = list(self.predictions.keys())
+        times = list(self.predicted_power.keys())
         for offset_hour in range(0, 24+width_hours):
-            forecasts = [self.predictions[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
+            forecasts = [self.predicted_power[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
             frame = TimeFrame(forecasts)
             frames.append(frame)
         frames = [frame for frame in frames if frame.start_time.astimezone(pytz.UTC) <= (datetime.now() + timedelta(hours=24)).astimezone(pytz.UTC)]
         return TimeFrames(frames)
 
     def __str__(self):
-        txt = "local time .......... pv power ..... irradiance ..... visibility .... fog probab. .... cloud cover\n"
-        for time in list(self.predictions.keys())[:24]:
-            power = str(round(self.predictions[time].power_watt))
-            irradiance = str(round(self.predictions[time].irradiance))
-            visibility = str(round(self.predictions[time].visibility))
-            probability_for_fog = str(round(self.predictions[time].probability_for_fog))
-            cloud_cover = str(round(self.predictions[time].cloud_cover))
+        txt = "time ................ pv power ..... irradiance ..... visibility .... fog probab. .... cloud cover\n"
+        for time in list(self.predicted_power.keys())[:24]:
+            power = str(round(self.predicted_power[time].power_watt))
+            irradiance = str(round(self.predicted_power[time].irradiance))
+            visibility = str(round(self.predicted_power[time].visibility))
+            probability_for_fog = str(round(self.predicted_power[time].probability_for_fog))
+            cloud_cover = str(round(self.predicted_power[time].cloud_cover))
             txt += time.strftime("%d %b, %H:%M") + " " + \
                    "".join(["."] * (10 - len(power))) + " " + power + " watt " + \
                    "".join(["."] * (15 - len(irradiance))) + " " + irradiance + " " + \

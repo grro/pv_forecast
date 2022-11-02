@@ -2,6 +2,7 @@ import logging
 import os.path
 import httpx
 import json
+import time
 from stream_unzip import stream_unzip
 from random import randrange
 import pytz
@@ -10,6 +11,10 @@ from os.path import exists
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 import xml.etree.ElementTree as ET
+
+
+def utc_to_local(utc: datetime) -> datetime:
+    return datetime.strptime((utc + (datetime.now() - datetime.utcnow())).strftime("%d.%m.%Y %H:%M:%S.%f"), "%d.%m.%Y %H:%M:%S.%f")
 
 
 
@@ -87,16 +92,16 @@ class ParameterUtcSeries:
     def size(self) -> int:
         return len(self.__series.keys())
 
-    def value_at(self, dt: datetime) -> float:
-        dt_utc = dt.astimezone(pytz.UTC)
+    def value_at(self, local_datetime: datetime) -> float:
+        dt_utc = local_datetime.astimezone(pytz.UTC)
         return self.__series.get(dt_utc.strftime("%Y.%m.%d %H"))
 
     def to_dict(self) -> Dict[str, Any]:
         return { "name": self.name,
                  "series": self.__series }
 
-    def merge(self, other, min_datetime: datetime):
-        min_datetime_utc = min_datetime.astimezone(pytz.UTC)
+    def merge(self, other, min_local_datetime: datetime):
+        min_datetime_utc = min_local_datetime.astimezone(pytz.UTC)
         min_datetime_utc_str = min_datetime_utc.strftime("%Y.%m.%d %H")
         merged_series = {}
         for time_utc in other.__series.keys():
@@ -135,54 +140,66 @@ class MosmixS:
                  parameter_series: Dict[str, ParameterUtcSeries]):
         self.station_id = station_id
         self.issue_time_utc = issue_time_utc
-        self.utc_date_from = date_from_utc
-        self.utc_date_to = date_to_utc
+        self.date_from_utc = date_from_utc
+        self.date_to_utc = date_to_utc
         self.__parameter_series = parameter_series
 
-    def merge(self, old_mosmix, min_datetime: datetime):
+    @property
+    def issue_time(self) -> datetime:
+        return utc_to_local(self.issue_time_utc)
+
+    @property
+    def date_from(self) -> datetime:
+        return utc_to_local(self.date_from_utc)
+
+    @property
+    def date_to(self) -> datetime:
+        return utc_to_local(self.date_to_utc)
+
+    def merge(self, old_mosmix, min_local_datetime: datetime):
         if old_mosmix is None:
             return self
         else:
             merged = MosmixS(self.station_id,
                              self.issue_time_utc,
-                             old_mosmix.utc_date_from,
-                             self.utc_date_to,
-                             {parameter: self.__parameter_series[parameter].merge(old_mosmix.__parameter_series[parameter], min_datetime) for parameter in self.__parameter_series.keys()} )
+                             old_mosmix.date_from_utc,
+                             self.date_to_utc,
+                             {parameter: self.__parameter_series[parameter].merge(old_mosmix.__parameter_series[parameter], min_local_datetime) for parameter in self.__parameter_series.keys()})
             logging.debug("merging \nold mosmix: " + str(old_mosmix) + " \nnew mosmix: " + str(self) + " \n-> " + str(merged))
             return merged
 
     def is_expired(self) -> bool:
-        content_age_sec = int((datetime.now(timezone.utc) - self.issue_time_utc).total_seconds())
-        return content_age_sec > (60*60 + 25*60 + randrange(15)*60)
+        content_age_min = int((datetime.now(timezone.utc) - self.issue_time_utc).total_seconds()/60)
+        return content_age_min > (60 + 25 + randrange(15))
 
-    def supports(self, dt: datetime) -> bool:
-        dt_utc = dt.astimezone(pytz.UTC)
-        return self.utc_date_from <= dt_utc <= self.utc_date_to
+    def supports(self, local_datetime: datetime) -> bool:
+        dt_utc = local_datetime.astimezone(pytz.UTC)
+        return self.date_from_utc <= dt_utc <= self.date_to_utc
 
-    def rad1h(self, dt: datetime) -> float:
-        return self.__parameter_series["Rad1h"].value_at(dt)
+    def rad1h(self, local_datetime: datetime) -> float:
+        return self.__parameter_series["Rad1h"].value_at(local_datetime)
 
-    def sund1(self, dt: datetime) -> float:
-        return self.__parameter_series["SunD1"].value_at(dt)
+    def sund1(self, local_datetime: datetime) -> float:
+        return self.__parameter_series["SunD1"].value_at(local_datetime)
 
-    def neff(self, dt: datetime) -> float:
-        return self.__parameter_series["Neff"].value_at(dt)
+    def neff(self, local_datetime: datetime) -> float:
+        return self.__parameter_series["Neff"].value_at(local_datetime)
 
-    def wwm(self, dt: datetime) -> float:
-        return self.__parameter_series["wwM"].value_at(dt)
+    def wwm(self, local_datetime: datetime) -> float:
+        return self.__parameter_series["wwM"].value_at(local_datetime)
 
-    def vv(self, dt: datetime) -> float:
-        return self.__parameter_series["VV"].value_at(dt)
+    def vv(self, local_datetime: datetime) -> float:
+        return self.__parameter_series["VV"].value_at(local_datetime)
 
     def __str__(self):
-        return "issued=" + self.issue_time_utc.strftime("%d.%m.%Y %H:%M") + "/" + str(self.__parameter_series["Rad1h"].size()) + " entries " + self.utc_date_from.strftime("%d.%m.%Y %H:%M") + " utc -> " + self.utc_date_to.strftime("%d.%m.%Y %H:%M") + " utc"
+        return "issued=" + self.issue_time.strftime("%d.%m.%Y %H:%M") + " / " + str(self.__parameter_series["Rad1h"].size()) + " entries " + self.date_from.strftime("%d.%m.%Y %H:%M") + " utc -> " + self.date_to.strftime("%d.%m.%Y %H:%M")
 
     def save(self, filename: str = "mosmix.json"):
         with open(filename, "w") as file:
             data = json.dumps({ "station_id": self.station_id,
                                 "issue_time_utc": self.issue_time_utc.isoformat(),
-                                "utc_date_from": self.utc_date_from.isoformat(),
-                                "utc_date_to": self.utc_date_to.isoformat(),
+                                "utc_date_from": self.date_from_utc.isoformat(),
+                                "utc_date_to": self.date_to_utc.isoformat(),
                                 "parameter_series": { parameter: self.__parameter_series[parameter].to_dict() for parameter in self.__parameter_series.keys()}})
             file.write(data)
 
@@ -241,8 +258,13 @@ class MosmixSWeb:
         # load cached mosmix
         cache_filename = os.path.join(MosmixSWeb.__cachedir(), "mosmixs_" + station_id + ".json")
         cached_mosmix = MosmixS.load(cache_filename)
-        if cached_mosmix is not None and not cached_mosmix.is_expired():
-            return cached_mosmix
+        if cached_mosmix is not None:
+            if cached_mosmix.is_expired():
+                elasped_minutes_since_last_cache_refresh = int((time.time() - os.path.getmtime(cache_filename)) / 60)
+                if elasped_minutes_since_last_cache_refresh < 10:   # at maximum all 10 min the (large!) mosmix file will be loaded via web
+                    return cached_mosmix
+            else:
+                return cached_mosmix
 
         # cached mosmix is expired
         url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'
