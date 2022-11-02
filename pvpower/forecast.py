@@ -14,7 +14,7 @@ from pvpower.tester import Tester
 
 class Trainer:
 
-    def train(self, train_log: TrainSampleLog, num_rounds: int = 10) -> Estimator:
+    def select_best_estimator(self, train_log: TrainSampleLog, num_rounds: int = 5) -> Estimator:
         samples = train_log.all()
 
         vectorizer_map = {
@@ -91,11 +91,6 @@ class PvPowerForecast:
         self.__estimator = Estimator(CoreVectorizer())
         self.__retrain()
 
-    def __update_with_best_estimator(self):
-        estimator = Trainer().train(self.train_log)
-        logging.info("update estimator with best estimator variant " + str(estimator))
-        self.__estimator = estimator
-
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
             try:
@@ -121,7 +116,7 @@ class PvPowerForecast:
         else:
             logging.debug("weather forecast for requested date time " + time.strftime("%Y.%m.%d %H:%M") + " ->  " + str(sample))
             predicted_power_watt = self.predict_by_weather_forecast(sample)
-            logging.debug("predicted power " + str(predicted_power_watt) + " watt")
+            logging.debug("predicted power " + str(predicted_power_watt) + " watt by " + str(self.__estimator))
             return predicted_power_watt
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
@@ -139,9 +134,10 @@ class PvPowerForecast:
 
     def __retrain(self):
         try:
-            samples = self.train_log.all()
-            self.__estimator.retrain(samples)
-            logging.info("prediction model retrained: " + str(self.__estimator))
+            self.__estimator.retrain(self.train_log.all())
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
+    def __update_with_best_estimator(self):
+        self.__estimator = Trainer().select_best_estimator(self.train_log)
+        logging.info("update estimator with best estimator variant " + str(self.__estimator))

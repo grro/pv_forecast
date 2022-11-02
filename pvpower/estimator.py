@@ -174,6 +174,7 @@ class Estimator:
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
             self.num_samples_last_train = len(cleaned_samples)
+        #logging.info("estimator retrained: " + str(self))
         return TrainReport(cleaned_samples)
 
     def __str__(self):
