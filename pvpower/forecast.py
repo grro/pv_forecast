@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
-from pvpower.estimator import Estimator, Vectorizer
+from pvpower.estimator import Estimator
 from pvpower.estimator import CoreVectorizer,PlusVisibilityVectorizer
 from pvpower.estimator import PlusVisibilityCloudCoverVectorizer, PlusCloudCoverVectorizer, PlusSunshineVectorizer
 from pvpower.estimator import PlusVisibilitySunshineVectorizer, PlusVisibilityFogCloudCoverVectorizer, FullVectorizer

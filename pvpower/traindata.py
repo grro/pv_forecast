@@ -99,12 +99,6 @@ class TrainSampleLog:
 
     def append(self, sample: LabelledWeatherForecast):
         with self.lock:
-            # plain file
-            fn = self.filename()
-            with open(fn, "ab") as file:
-                line = sample.to_csv() + "\n"
-                file.write(line.encode(encoding='UTF-8'))
-
             # compressed file
             compr_fn = self.filename(compressed=True)
             with gzip.open(compr_fn, "ab") as file:
@@ -117,6 +111,22 @@ class TrainSampleLog:
 
     def all(self) -> List[LabelledWeatherForecast]:
         with self.lock:
+            # plain file
+            fn = self.filename()
+            if exists(fn):
+                try:
+                    with open(fn, "rb") as file:
+                        lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
+                        samples = []
+                        for line in lines:
+                            try:
+                                samples.append(LabelledWeatherForecast.from_csv(line))
+                            except Exception as e:
+                                logging.warning(e)
+                        return samples
+                except Exception as e:
+                    logging.warning("error occurred loading " + fn + " " + str(e))
+
             # compressed file
             compr_fn = self.filename(compressed=True)
             if exists(compr_fn):
