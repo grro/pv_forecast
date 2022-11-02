@@ -30,6 +30,101 @@ class Vectorizer(ABC):
         pass
 
 
+
+class CoreVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000)]
+        return vectorized
+
+    def __str__(self):
+        return "CoreVectorizer"
+
+
+class PlusVisibilityVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.visibility, 50000)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+VisibilityVectorizer"
+
+
+class PlusSunshineVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.sunshine, 5000)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+SunshineVectorizer"
+
+
+class PlusCloudCoverVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.cloud_cover, 200)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+CloudVectorizer"
+
+
+class PlusVisibilitySunshineVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.visibility, 50000),
+                      self._scale(sample.sunshine, 5000)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+Visibility+SunshineVectorizer"
+
+
+class PlusVisibilityCloudCoverVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.visibility, 50000),
+                      self._scale(sample.cloud_cover, 200)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+Visibility+CloudVectorizer"
+
+
+class PlusVisibilityFogCloudCoverVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.irradiance, 1000),
+                      self._scale(sample.visibility, 50000),
+                      self._scale(sample.probability_for_fog, 100),
+                      self._scale(sample.cloud_cover, 100)]
+        return vectorized
+
+    def __str__(self):
+        return "Core+Visibility+Fog+CloudVectorizer"
+
+
 class FullVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
@@ -54,17 +149,12 @@ class TrainReport:
 
 class Estimator:
 
-    def __init__(self, classifier= None, vectorizer: Vectorizer = None):
+    def __init__(self, vectorizer: Vectorizer):
         # it seems that the SVM approach produces good predictions
         # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        if classifier is None:
-            self.__clf = svm.SVC(kernel='poly')
-        else:
-            self.__clf = classifier
-        if vectorizer is None:
-            self.__vectorizer = FullVectorizer()
-        else:
-            self.__vectorizer = vectorizer
+        self.__clf = svm.SVC(kernel='poly')
+
+        self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
         # initialize with dummy data
         self.retrain([LabelledWeatherForecast(datetime.now(), 1, 0, 0, 0, 0, 0), LabelledWeatherForecast(datetime.now() - timedelta(days=1), 1, 0, 0, 0, 0, 1)])

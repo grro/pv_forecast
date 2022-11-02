@@ -5,7 +5,48 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
-from pvpower.estimator import Estimator, TrainReport
+from pvpower.estimator import Estimator, Vectorizer
+from pvpower.estimator import CoreVectorizer,PlusVisibilityVectorizer
+from pvpower.estimator import PlusVisibilityCloudCoverVectorizer, PlusCloudCoverVectorizer, PlusSunshineVectorizer
+from pvpower.estimator import PlusVisibilitySunshineVectorizer, PlusVisibilityFogCloudCoverVectorizer, FullVectorizer
+from pvpower.tester import Tester
+
+
+class Trainer:
+
+    def train(self, train_log: TrainSampleLog, num_rounds: int = 10) -> Estimator:
+        samples = train_log.all()
+
+        vectorizer_map = {
+            "core": CoreVectorizer(),
+            "+visibility": PlusVisibilityVectorizer(),
+            "+sunshine": PlusSunshineVectorizer(),
+            "+cloudcover": PlusCloudCoverVectorizer(),
+            "+visibility +sunshine": PlusVisibilitySunshineVectorizer(),
+            "+visibility +cloudcover": PlusVisibilityCloudCoverVectorizer(),
+            "+visibility +fog +cloudcover": PlusVisibilityFogCloudCoverVectorizer(),
+            "+visibility +fog +cloudcover +sunshine": FullVectorizer(),
+        }
+
+        lowest_score = 10000
+        best_estimator = Estimator(CoreVectorizer())
+
+        days = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in samples]))
+        report = "tested with " + str(len(samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
+        report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
+        for variant, vectorizer in vectorizer_map.items():
+            estimator = Estimator(vectorizer)
+            test_reports = Tester(samples).evaluate(estimator, rounds=num_rounds)
+            median_report = test_reports[int(len(test_reports)*0.5)]
+            score_str = str(round(median_report.score))
+            distribution = str(round(test_reports[0].score)) + ", " + str(round(test_reports[1].score)) + ", " + str(round(test_reports[2].score)) + ", " + str(round(test_reports[3].score)) + ", ..., " + str(round(test_reports[int(len(test_reports)*0.5)].score)) + ", ..., " + str(round(test_reports[-4].score)) + ", " + str(round(test_reports[-3].score)) + ", " + str(round(test_reports[-2].score)) + ", " + str(round(test_reports[-1].score))
+            report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score_str)))) + " " + score_str + " ....... " + distribution + "\n"
+            if median_report.score < lowest_score:
+                best_estimator = estimator
+                lowest_score = median_report.score
+        logging.info(report)
+        return best_estimator
+
 
 
 class ValueRecorder:
@@ -44,19 +85,16 @@ class PvPowerForecast:
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(train_dir)
         self.__train_value_recorder = ValueRecorder()
-        self.__estimator = Estimator()
+        self.__estimator = Estimator(CoreVectorizer())
         self.__date_last_retrain = datetime.now()
+        self.__date_best_estimator_selected = datetime.now()
         self.__retrain()
+        Thread(target=self.__update_with_best_estimator, daemon=True).start()
 
-    def __retrain(self) -> TrainReport:
-        try:
-            logging.info("retrain with train log " + self.train_log.filename())
-            samples = self.train_log.all()
-            train_report = self.__estimator.retrain(samples)
-            logging.info("prediction model retrained: " + str(self.__estimator))
-            return train_report
-        except Exception as e:
-            logging.warning("error occurred retrain prediction model " + str(e))
+    def __update_with_best_estimator(self):
+        estimator = Trainer().train(self.train_log)
+        logging.info("update estimator with best estimator variant " + str(estimator))
+        self.__estimator = estimator
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -78,10 +116,23 @@ class PvPowerForecast:
         self.train_log.append(annotated_sample)
 
         # retrain, if necessary
-        max_retrain_period = 60 if (self.__estimator.num_samples_last_train < 5000) else 30*24*60  # 1 day or 1 month
+        max_retrain_period = 24*60 if (self.__estimator.num_samples_last_train < 5000) else 30*24*60  # 1 day or 1 month
         if datetime.now() > (self.__date_last_retrain + timedelta(minutes=max_retrain_period)):
             self.__date_last_retrain = datetime.now()
-            Thread(target=self.__retrain, daemon=True).start()
+            if datetime.now() > (self.__date_best_estimator_selected + timedelta(days=15)):
+                self.__date_best_estimator_selected = datetime.now()
+                Thread(target=self.__update_with_best_estimator, daemon=True).start()
+            else:
+                Thread(target=self.__retrain, daemon=True).start()
+
+    def __retrain(self):
+        try:
+            logging.info("retrain with train log " + self.train_log.filename())
+            samples = self.train_log.all()
+            train_report = self.__estimator.retrain(samples)
+            logging.info("prediction model retrained: " + str(self.__estimator))
+        except Exception as e:
+            logging.warning("error occurred retrain prediction model " + str(e))
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         return self.__estimator.predict(sample)
