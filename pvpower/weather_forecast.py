@@ -22,7 +22,7 @@ class WeatherForecast:
         self.visibility = visibility
 
     def __utc_to_local(self, utc: datetime) -> datetime:
-        return datetime.strptime((utc + (datetime.now() - datetime.utcnow())).strftime("%d.%m.%Y %H:%M:%S.%f"), "%d.%m.%Y %H:%M:%S.%f")
+        return datetime.strptime((utc + (datetime.now() - datetime.utcnow())).strftime("%d.%m.%Y %H:%M:%S"), "%d.%m.%Y %H:%M:%S")
 
     @property
     def time(self) -> datetime:

@@ -82,10 +82,15 @@ class TimeFrames:
         return txt
 
 
+
 class Next24hours:
 
     def __init__(self, predicted_power: Dict[datetime, LabelledWeatherForecast]):
         self.predicted_power = predicted_power
+
+    @staticmethod
+    def __round_hour(dt: datetime) -> datetime:
+        return (dt.replace(second=0, microsecond=0, minute=0, hour=dt.hour) +timedelta(hours=dt.minute//30))
 
     @staticmethod
     def of(pv_forecast: PvPowerForecast):
@@ -95,7 +100,7 @@ class Next24hours:
             if weather_forecast is not None:
                 predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
                 if predicted_value is not None:
-                    predicted_power[weather_forecast.time] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
+                    predicted_power[Next24hours.__round_hour(weather_forecast.time)] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
         return Next24hours(predicted_power)
 
     def __prediction_values(self) -> List[int]:
@@ -142,7 +147,5 @@ class Next24hours:
                    "".join(["."] * (15 - len(probability_for_fog))) + " " + probability_for_fog +  " " + \
                    "".join(["."] * (15 - len(cloud_cover))) + " " + cloud_cover + "\n"
         return txt
-
-
 
 
