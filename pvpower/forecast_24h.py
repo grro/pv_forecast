@@ -89,7 +89,7 @@ class Next24hours:
 
     @staticmethod
     def of(pv_forecast: PvPowerForecast):
-        now = datetime.strptime((datetime.now()).strftime("%d.%m.%Y %H"), "%d.%m.%Y %H")
+        now = datetime.strptime((datetime.now()).strftime("%d.%m.%Y %H") + ":00", "%d.%m.%Y %H:%S")
         predicted_power = {}
         for weather_forecast in [pv_forecast.weather_forecast_service.forecast(prediction_time) for prediction_time in [now + timedelta(hours=i) for i in range(0, 40)]]:
             if weather_forecast is not None:
