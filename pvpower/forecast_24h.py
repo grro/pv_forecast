@@ -133,16 +133,18 @@ class Next24hours:
         return TimeFrames(frames)
 
     def __str__(self):
-        txt = "time ................ pv power ..... irradiance ..... visibility .... fog probab. .... cloud cover\n"
+        txt = "time ................ pv power ..... irradiance ....... sunshine .... visibility .... fog probab. .... cloud cover\n"
         for time in list(self.predicted_power.keys())[:24]:
             power = str(round(self.predicted_power[time].power_watt))
             irradiance = str(round(self.predicted_power[time].irradiance))
             visibility = str(round(self.predicted_power[time].visibility))
+            sunshine = str(round(self.predicted_power[time].sunshine))
             probability_for_fog = str(round(self.predicted_power[time].probability_for_fog))
             cloud_cover = str(round(self.predicted_power[time].cloud_cover))
             txt += time.strftime("%d %b, %H:%M") + " " + \
                    "".join(["."] * (10 - len(power))) + " " + power + " watt " + \
                    "".join(["."] * (15 - len(irradiance))) + " " + irradiance + " " + \
+                   "".join(["."] * (15 - len(sunshine))) + " " + sunshine + \
                    "".join(["."] * (15 - len(visibility))) + " " + visibility + " " + \
                    "".join(["."] * (15 - len(probability_for_fog))) + " " + probability_for_fog +  " " + \
                    "".join(["."] * (15 - len(cloud_cover))) + " " + cloud_cover + "\n"

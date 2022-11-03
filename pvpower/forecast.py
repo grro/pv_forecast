@@ -124,7 +124,7 @@ class PvPowerForecast:
             return self.__estimator.predict(sample)
         finally:
             # retrain, if necessary
-            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 23 hours
+            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
                 self.__date_last_retrain = datetime.now()
                 if datetime.now() > (self.__date_best_estimator_selected + timedelta(days=30)):  # each 1 month
                     self.__date_best_estimator_selected = datetime.now()
@@ -135,6 +135,7 @@ class PvPowerForecast:
     def __retrain(self):
         try:
             self.__estimator.retrain(self.train_log.all())
+            logging.info("estimator retrained " + str(self.__estimator))
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
 
