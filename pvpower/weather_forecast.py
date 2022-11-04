@@ -45,7 +45,7 @@ class WeatherForecast:
                self.visibility is not None
 
     def __str__(self):
-        return self.time_utc.strftime("%Y.%m.%d %H:%M") + " utc" + \
+        return self.time.strftime("%Y.%m.%d %H:%M") + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
                ", cloud_cover=" + str(round(self.cloud_cover)) + \

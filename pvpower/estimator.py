@@ -1,7 +1,6 @@
-import logging
 import pytz
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from abc import ABC, abstractmethod
 from sklearn import svm
 from typing import List
@@ -146,20 +145,84 @@ class TrainReport:
     samples: List[LabelledWeatherForecast]
 
 
+class TestReport:
+
+    def __init__(self, train_report: TrainReport, validation_samples: List[LabelledWeatherForecast], predictions: List[int]):
+        self.train_report = train_report
+        self.validation_samples = validation_samples
+        self.predictions = predictions
+
+    def __percent(self, real, predicted):
+        if real == 0:
+            return 0
+        elif predicted == 0:
+            return 0
+        else:
+            return round((predicted * 100 / real) - 100, 2)
+
+    def __diff_all(self) -> List[float]:
+        diff_total = []
+        for i in range(len(self.validation_samples)):
+            if self.validation_samples[i].irradiance == 0:
+                continue
+            else:
+                predicted = self.predictions[i]
+
+            real = self.validation_samples[i].power_watt
+            if real == 0:
+                if predicted == 0:     # ignore true 0 predictions to void wasting the score
+                    diff = 0
+                else:
+                    diff = 100
+            else:
+                if real < 10 and abs(predicted - real) < 10:  # ignore diff < 10
+                    diff = 0
+                else:
+                    diff = self.__percent(real, predicted)
+            diff_total.append(diff)
+        return sorted(diff_total)
+
+    @property
+    def score(self) -> float:
+        values = sorted(list(self.__diff_all()))
+        values = values[2:-2]
+        abs_values = [abs(value) for value in values]
+        if abs_values == 0:
+            return 10000
+        else:
+            return round(sum(abs_values) / len(abs_values), 2)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        txt = "score:  " + str(self.score) + " (samples: " + str(len(self.train_report.samples)) + ")\n"
+        txt += '{:14s}        {:14s} {:14s} {:14s} {:14s} {:14s}         {:10s} {:10s}           {:10s}\n'.format("time", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog", "real", "predicted", "diff[%]")
+        for i in range(0, len(self.validation_samples)):
+            txt += '{:<14s}        {:<14d} {:<14d} {:<14d} {:<14d}  {:<14d}        {:<10d} {:<10d}           {:<10d}\n'.format(self.validation_samples[i].time.strftime("%d.%b  %H:%M"),
+                                                                                                                               self.validation_samples[i].irradiance,
+                                                                                                                               self.validation_samples[i].sunshine,
+                                                                                                                               self.validation_samples[i].cloud_cover,
+                                                                                                                               self.validation_samples[i].visibility,
+                                                                                                                               self.validation_samples[i].probability_for_fog,
+                                                                                                                               self.validation_samples[i].power_watt,
+                                                                                                                               self.predictions[i],
+                                                                                                                               int(self.__percent(self.validation_samples[i].power_watt, self.predictions[i])))
+        txt = txt + "\nscore:  " + str(self.score)
+        return txt
+
 
 class Estimator:
 
     def __init__(self, vectorizer: Vectorizer):
-        # it seems that the SVM approach produces good predictions
-        # refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        self.__clf = svm.SVC(kernel='poly')
+        self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
         self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
+        self.num_covered_days_last_train = 0
+        self.__score = None
 
     def usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
-        return sample.irradiance > 0 \
-               and sample.sunshine is not None \
-               and sample.visibility is not None
+        return sample.irradiance > 0
 
     def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
@@ -174,11 +237,37 @@ class Estimator:
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
             self.num_samples_last_train = len(cleaned_samples)
-        #logging.info("estimator retrained: " + str(self))
+            self.num_covered_days_last_train = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in cleaned_samples]))
         return TrainReport(cleaned_samples)
 
+    def test(self, samples: List[LabelledWeatherForecast], rounds: int = 10) -> TestReport:
+        test_reports = []
+        test_estimator = Estimator(self.__vectorizer)
+        cleaned_samples = test_estimator.clean_data(samples)
+
+        step_width = int(len(cleaned_samples) / rounds)
+        if step_width < 1:
+            step_width = 1
+        for i in range(0, rounds):
+            # split test data
+            num_train_samples = int(len(cleaned_samples) * 0.65)
+            train_samples = cleaned_samples[0: num_train_samples]
+            validation_samples = cleaned_samples[num_train_samples:]
+
+            # train and test
+            train_report = test_estimator.retrain(train_samples)
+            predicted = [test_estimator.predict(test_sample) for test_sample in validation_samples]
+            test_reports.append(TestReport(train_report, validation_samples, predicted))
+
+            cleaned_samples = cleaned_samples[-step_width:] + cleaned_samples[:-step_width]
+
+        test_reports.sort(key=lambda report: report.score)
+        median_report = test_reports[int(len(test_reports)*0.5)]
+        self.__score = median_report.score
+        return median_report
+
     def __str__(self):
-        return "Estimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.num_samples_last_train) + " samples)"
+        return "Estimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.num_samples_last_train) + " samples; " + str(self.num_covered_days_last_train) + " days)"
 
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:

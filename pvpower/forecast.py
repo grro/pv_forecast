@@ -9,7 +9,6 @@ from pvpower.estimator import Estimator
 from pvpower.estimator import CoreVectorizer,PlusVisibilityVectorizer
 from pvpower.estimator import PlusVisibilityCloudCoverVectorizer, PlusCloudCoverVectorizer, PlusSunshineVectorizer
 from pvpower.estimator import PlusVisibilitySunshineVectorizer, PlusVisibilityFogCloudCoverVectorizer, FullVectorizer
-from pvpower.tester import Tester
 
 
 class Trainer:
@@ -33,14 +32,12 @@ class Trainer:
 
         days = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in samples]))
         report = "tested with " + str(len(samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
-        report += "VARIANT ................................. SCORE ....... DISTRIBUTION\n"
+        report += "VARIANT ................................. SCORE\n"
         for variant, vectorizer in vectorizer_map.items():
             estimator = Estimator(vectorizer)
-            test_reports = Tester(samples).evaluate(estimator, rounds=num_rounds)
-            median_report = test_reports[int(len(test_reports)*0.5)]
-            score_str = str(round(median_report.score))
-            distribution = str(round(test_reports[0].score)) + ", " + str(round(test_reports[1].score)) + ", " + str(round(test_reports[2].score)) + ", " + str(round(test_reports[3].score)) + ", ..., " + str(round(test_reports[int(len(test_reports)*0.5)].score)) + ", ..., " + str(round(test_reports[-4].score)) + ", " + str(round(test_reports[-3].score)) + ", " + str(round(test_reports[-2].score)) + ", " + str(round(test_reports[-1].score))
-            report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score_str)))) + " " + score_str + " ....... " + distribution + "\n"
+            median_report = estimator.test(samples, rounds=10)
+            score_str = str(round(median_report.score, 1))
+            report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score_str)))) + " " + score_str + "\n"
             if median_report.score < lowest_score:
                 best_estimator = estimator
                 lowest_score = median_report.score
