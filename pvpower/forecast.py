@@ -35,7 +35,7 @@ class Trainer:
         report += "VARIANT ................................. SCORE\n"
         for variant, vectorizer in vectorizer_map.items():
             estimator = Estimator(vectorizer)
-            median_report = estimator.test(samples, rounds=10)
+            median_report = estimator.test(samples, rounds=num_rounds)
             score_str = str(round(median_report.score, 1))
             report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score_str)))) + " " + score_str + "\n"
             if median_report.score < lowest_score:
