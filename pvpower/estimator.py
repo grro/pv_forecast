@@ -1,3 +1,4 @@
+import logging
 import pytz
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,99 +43,71 @@ class CoreVectorizer(Vectorizer):
         return "CoreVectorizer"
 
 
-class PlusVisibilityVectorizer(Vectorizer):
+class PlusVisibilityVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.visibility, 50000)]
 
     def __str__(self):
         return "Core+VisibilityVectorizer"
 
 
-class PlusSunshineVectorizer(Vectorizer):
+class PlusSunshineVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.sunshine, 5000)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.sunshine, 5000)]
 
     def __str__(self):
         return "Core+SunshineVectorizer"
 
 
-class PlusCloudCoverVectorizer(Vectorizer):
+class PlusCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.cloud_cover, 200)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.cloud_cover, 200)]
 
     def __str__(self):
         return "Core+CloudVectorizer"
 
 
-class PlusVisibilitySunshineVectorizer(Vectorizer):
+class PlusVisibilitySunshineVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000),
-                      self._scale(sample.sunshine, 5000)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
+                                             self._scale(sample.sunshine, 5000)]
 
     def __str__(self):
         return "Core+Visibility+SunshineVectorizer"
 
 
-class PlusVisibilityCloudCoverVectorizer(Vectorizer):
+class PlusVisibilityCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000),
-                      self._scale(sample.cloud_cover, 200)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
+                                             self._scale(sample.cloud_cover, 200)]
 
     def __str__(self):
         return "Core+Visibility+CloudVectorizer"
 
 
-class PlusVisibilityFogCloudCoverVectorizer(Vectorizer):
+class PlusVisibilityFogCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000),
-                      self._scale(sample.probability_for_fog, 100),
-                      self._scale(sample.cloud_cover, 100)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
+                                             self._scale(sample.cloud_cover, 200),
+                                             self._scale(sample.probability_for_fog, 100)]
 
     def __str__(self):
         return "Core+Visibility+Fog+CloudVectorizer"
 
 
-class FullVectorizer(Vectorizer):
+class FullVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
-                      self._scale(sample.irradiance, 1000),
-                      self._scale(sample.visibility, 50000),
-                      self._scale(sample.probability_for_fog, 100),
-                      self._scale(sample.cloud_cover, 100),
-                      self._scale(sample.sunshine, 5000)]
-        return vectorized
+        return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
+                                             self._scale(sample.cloud_cover, 200),
+                                             self._scale(sample.probability_for_fog, 100),
+                                             self._scale(sample.sunshine, 5000)]
 
     def __str__(self):
         return "FullVectorizer"
@@ -272,7 +245,8 @@ class Estimator:
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:
             feature_vector = self.__vectorizer.vectorize(sample)
-            predicted = self.__clf.predict([feature_vector])[0]
-            return int(predicted)
+            predicted = int(self.__clf.predict([feature_vector])[0])
+            logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
+            return predicted
         else:
             return 0

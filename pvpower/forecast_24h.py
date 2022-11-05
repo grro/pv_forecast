@@ -40,7 +40,7 @@ class TimeFrame:
         return self.__str__()
 
     def __str__(self) -> str:
-        return self.__hourly_forecasts[0].time_utc.strftime("%d.%m %H:%M") + " -> " + self.__hourly_forecasts[-1].time_utc.strftime("%H") + ":59" + "; total: " + ", ".join([str(hourly_forecast.power_watt) for hourly_forecast in self.__hourly_forecasts])
+        return self.__hourly_forecasts[0].time.strftime("%H:%M") + "->" + self.__hourly_forecasts[-1].time.strftime("%H") + ":00" + "; expected power/hour: " + ", ".join([str(hourly_forecast.power_watt)  + " watt" for hourly_forecast in self.__hourly_forecasts])
 
 
 class TimeFrames:
@@ -54,6 +54,9 @@ class TimeFrames:
 
     def empty(self) -> bool:
         return len(self.__frames) == 0
+
+    def __len__(self):
+        return len(self.__frames)
 
     def best(self) -> Optional[TimeFrame]:
         if len(self.__frames) > 0:

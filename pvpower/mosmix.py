@@ -192,7 +192,7 @@ class MosmixS:
         return self.__parameter_series["VV"].value_at(local_datetime)
 
     def __str__(self):
-        return "issued=" + self.issue_time.strftime("%d.%m.%Y %H:%M") + " / " + str(self.__parameter_series["Rad1h"].size()) + " entries " + self.date_from.strftime("%d.%m.%Y %H:%M") + " utc -> " + self.date_to.strftime("%d.%m.%Y %H:%M")
+        return "issued=" + self.issue_time.strftime("%d.%m.%Y %H:%M") + " / " + str(self.__parameter_series["Rad1h"].size()) + " entries (" + self.date_from.strftime("%d.%m.%Y %H:%M") + " -> " + self.date_to.strftime("%d.%m.%Y %H:%M") + ")"
 
     def save(self, filename: str = "mosmix.json"):
         with open(filename, "w") as file:
@@ -283,5 +283,3 @@ class MosmixSWeb:
         mosmix = mosmix.merge(cached_mosmix, datetime.now() - timedelta(days=1))
         mosmix.save(cache_filename)
         return mosmix
-
-

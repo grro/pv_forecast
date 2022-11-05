@@ -32,7 +32,7 @@ class Trainer:
 
         days = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in samples]))
         report = "tested with " + str(len(samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
-        report += "VARIANT ................................. SCORE\n"
+        report += "VARIANT ............................ DERIVATION\n"
         for variant, vectorizer in vectorizer_map.items():
             estimator = Estimator(vectorizer)
             median_report = estimator.test(samples, rounds=num_rounds)
@@ -111,10 +111,7 @@ class PvPowerForecast:
                          " -> " + self.weather_forecast_service.forcast_to().strftime("%Y.%m.%d %H:%M")  + "). Returning None")
             return None
         else:
-            logging.debug("weather forecast for requested date time " + time.strftime("%Y.%m.%d %H:%M") + " ->  " + str(sample))
-            predicted_power_watt = self.predict_by_weather_forecast(sample)
-            logging.debug("predicted power " + str(predicted_power_watt) + " watt by " + str(self.__estimator))
-            return predicted_power_watt
+            return self.predict_by_weather_forecast(sample)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
         try:
