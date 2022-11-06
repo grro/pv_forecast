@@ -70,7 +70,7 @@ class WeatherStation:
 
         if self.__mosmix.is_expired():
             mosmix = MosmixSWeb.load(self.__station)
-            if mosmix.__date_from_utc > self.__mosmix.__date_from_utc:
+            if mosmix.date_from > self.__mosmix.date_from:
                 logging.info("updated mosmix file loaded")
                 self.__mosmix = mosmix
 
