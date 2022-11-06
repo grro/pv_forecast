@@ -139,42 +139,42 @@ class MosmixS:
                  date_to_utc: datetime,
                  parameter_series: Dict[str, ParameterUtcSeries]):
         self.station_id = station_id
-        self.issue_time_utc = issue_time_utc
-        self.date_from_utc = date_from_utc
-        self.date_to_utc = date_to_utc
+        self.__issue_time_utc = issue_time_utc
+        self.__date_from_utc = date_from_utc
+        self.__date_to_utc = date_to_utc
         self.__parameter_series = parameter_series
 
     @property
     def issue_time(self) -> datetime:
-        return utc_to_local(self.issue_time_utc)
+        return utc_to_local(self.__issue_time_utc)
 
     @property
     def date_from(self) -> datetime:
-        return utc_to_local(self.date_from_utc)
+        return utc_to_local(self.__date_from_utc)
 
     @property
     def date_to(self) -> datetime:
-        return utc_to_local(self.date_to_utc)
+        return utc_to_local(self.__date_to_utc)
 
     def merge(self, old_mosmix, min_local_datetime: datetime):
         if old_mosmix is None:
             return self
         else:
             merged = MosmixS(self.station_id,
-                             self.issue_time_utc,
-                             old_mosmix.date_from_utc,
-                             self.date_to_utc,
+                             self.__issue_time_utc,
+                             old_mosmix.__date_from_utc,
+                             self.__date_to_utc,
                              {parameter: self.__parameter_series[parameter].merge(old_mosmix.__parameter_series[parameter], min_local_datetime) for parameter in self.__parameter_series.keys()})
             logging.debug("merging \nold mosmix: " + str(old_mosmix) + " \nnew mosmix: " + str(self) + " \n-> " + str(merged))
             return merged
 
     def is_expired(self) -> bool:
-        content_age_min = int((datetime.now(timezone.utc) - self.issue_time_utc).total_seconds()/60)
+        content_age_min = int((datetime.now(timezone.utc) - self.__issue_time_utc).total_seconds() / 60)
         return content_age_min > (60 + 25 + randrange(15))
 
     def supports(self, local_datetime: datetime) -> bool:
         dt_utc = local_datetime.astimezone(pytz.UTC)
-        return self.date_from_utc <= dt_utc <= self.date_to_utc
+        return self.__date_from_utc <= dt_utc <= self.__date_to_utc
 
     def rad1h(self, local_datetime: datetime) -> float:
         return self.__parameter_series["Rad1h"].value_at(local_datetime)
@@ -197,9 +197,9 @@ class MosmixS:
     def save(self, filename: str = "mosmix.json"):
         with open(filename, "w") as file:
             data = json.dumps({ "station_id": self.station_id,
-                                "issue_time_utc": self.issue_time_utc.isoformat(),
-                                "utc_date_from": self.date_from_utc.isoformat(),
-                                "utc_date_to": self.date_to_utc.isoformat(),
+                                "issue_time_utc": self.__issue_time_utc.isoformat(),
+                                "utc_date_from": self.__date_from_utc.isoformat(),
+                                "utc_date_to": self.__date_to_utc.isoformat(),
                                 "parameter_series": { parameter: self.__parameter_series[parameter].to_dict() for parameter in self.__parameter_series.keys()}})
             file.write(data)
 

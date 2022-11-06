@@ -1,4 +1,3 @@
-import pytz
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from pvpower.forecast import PvPowerForecast, LabelledWeatherForecast
@@ -64,11 +63,13 @@ class TimeFrames:
         else:
             return None
 
-    def second_best(self) -> Optional[TimeFrame]:
-        if len(self.__frames) > 1:
-            return self.__frames[1]
+    def pos(self, pos: int, dflt: TimeFrame = None) -> TimeFrame:
+        if dflt is None:
+            dflt = self.__frames[0]
+        if pos < len(self.__frames):
+            return self.__frames[pos]
         else:
-            return None
+            return dflt
 
     def all(self) -> List[TimeFrame]:
         return list(self.__frames)
@@ -132,7 +133,7 @@ class Next24hours:
             forecasts = [self.predicted_power[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
             frame = TimeFrame(forecasts)
             frames.append(frame)
-        frames = [frame for frame in frames if frame.start_time.astimezone(pytz.UTC) <= (datetime.now() + timedelta(hours=24)).astimezone(pytz.UTC)]
+        frames = [frame for frame in frames if frame.start_time <= (datetime.now() + timedelta(hours=24))]
         return TimeFrames(frames)
 
     def __str__(self):

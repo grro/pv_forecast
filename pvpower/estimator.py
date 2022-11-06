@@ -210,7 +210,7 @@ class Estimator:
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
             self.num_samples_last_train = len(cleaned_samples)
-            self.num_covered_days_last_train = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in cleaned_samples]))
+            self.num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in cleaned_samples]))
         return TrainReport(cleaned_samples)
 
     def test(self, samples: List[LabelledWeatherForecast], rounds: int = 10) -> TestReport:

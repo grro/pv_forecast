@@ -25,7 +25,7 @@ class TestMosmix(unittest.TestCase):
             mosmix.save(temp_file)
             restored_mosmix = MosmixS.load(temp_file)
             self.assertEqual(mosmix.station_id, restored_mosmix.station_id)
-            self.assertEqual(mosmix.issue_time_utc, restored_mosmix.issue_time_utc)
+            self.assertEqual(mosmix.__issue_time_utc, restored_mosmix.__issue_time_utc)
             self.assertEqual(mosmix.is_expired(), restored_mosmix.is_expired())
             time = datetime.now() + timedelta(days=5)
             self.assertEqual(mosmix.supports(time), restored_mosmix.supports(time))

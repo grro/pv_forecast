@@ -1,7 +1,7 @@
 # photovoltaic power forecast
 
 pv_forecast provides a set of artifacts to obtain PV solar power forecast. The library uses machine learning approaches to perform forecasts.
-To get appropriated results, real measured PV power values must be delivered, periodically. Internally, the library make use of [DWD](https://dwd-geoportal.de/products/G_FJM/) weather forecast data.
+To get appropriated results, real measured PV power values must be delivered, periodically. Internally, the library makes use of [DWD](https://dwd-geoportal.de/products/G_FJM/) weather forecast data.
 
 **Installing the library**
 
@@ -44,14 +44,14 @@ while True:
     time.sleep(60)
 ```
 The provided real measurements will be stored internally on disc and be used to update the internal prediction model. 
-Please consider, that more accurate forecast predictions require collecting real PV measurements for at least 2 weeks, typically. 
-Do not stop providing measurements, even though the prediction becomes better and better. 
+Please consider, that a more accurate forecast requires collecting real PV measurements for at least 2-3 weeks, typically. 
+Do not stop providing measurements, even though the predictions become better and better. 
 You may use a periodic job to provide the real PV values
 
 **Energy management system support**
 
 The basic functionality of this library is to support photovoltaic power forecast. However, to maximize the yield 
-of your PV system, your home appliances such as a dishwasher or laundry machines should operate only in periods when 
+of your PV system, your home appliances such as a dishwasher or laundry machine should operate only in periods when 
 your PV system is delivering sufficient solar power. To manage this, the *Next24hours* convenience class can be used as shown below 
 ```
 from pvpower.forecast import PvPowerForecast
@@ -70,11 +70,12 @@ Based on the resulting time frames the best one is used to start the home applia
 ```
 ...
 pogram_duration_hours = 3
-best_time_frame = next24h.frames(width_hours=pogram_duration_hours).filter(min_watt_per_hour=350).best()
-if best_time_frame is None:
-    #.. start now (no sufficient solar power next 24h)
+high_power_3h_frames = next24h.frames(width_hours=pogram_duration_hours).filter(min_watt_per_hour=350)
+if high_power_3h_frames.empty():
+    # start now (no sufficient solar power within next 24h)
+    my_dishwasher.start_delayed(datetime.now())
 else:
-    # .. start delayed when best window is reached
-    start_time = best_time_frame.start_time
-    ...
+    # start delayed when best frame is reached
+    best_3h_frame = high_power_3h_frames.best()
+    my_dishwasher.start_delayed(best_frame.start_time)
 ```

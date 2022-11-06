@@ -30,7 +30,7 @@ class Trainer:
         lowest_score = 10000
         best_estimator = Estimator(CoreVectorizer())
 
-        days = len(set([sample.time_utc.strftime("%Y.%m.%d") for sample in samples]))
+        days = len(set([sample.time.strftime("%Y.%m.%d") for sample in samples]))
         report = "tested with " + str(len(samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
         report += "VARIANT ............................ DERIVATION\n"
         for variant, vectorizer in vectorizer_map.items():
