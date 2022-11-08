@@ -246,7 +246,11 @@ class Estimator:
         if sample.irradiance > 0:
             feature_vector = self.__vectorizer.vectorize(sample)
             predicted = int(self.__clf.predict([feature_vector])[0])
-            logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
-            return predicted
+            #logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
+            if predicted >= 0:
+                return predicted
+            else:
+                logging.debug("predicted value is " + str(predicted) + " correct them to 0")
+                return 0
         else:
             return 0

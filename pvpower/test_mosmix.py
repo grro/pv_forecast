@@ -3,7 +3,7 @@ import tempfile
 import os
 import pytz
 from random import randrange
-from pvpower.mosmix import MosmixSWeb, MosmixS
+from pvpower.mosmix import MosmixS, MemoryCachedMosmixLoader
 from datetime import datetime, timedelta
 
 
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 class TestMosmix(unittest.TestCase):
 
     def test_load_from_web(self):
-        mosmix = MosmixSWeb.load('N0677')
+        mosmix = MemoryCachedMosmixLoader('N0677').get()
         tomorrow = datetime.now() + timedelta(days=1)
         irradiance = mosmix.rad1h(tomorrow)
         self.assertTrue(irradiance >= 0)
@@ -19,13 +19,13 @@ class TestMosmix(unittest.TestCase):
         #print("issue time local: " + str(mosmix.issue_time))
 
     def test_save_and_restore(self):
-        mosmix = MosmixSWeb.load('N0677')
+        mosmix = MemoryCachedMosmixLoader('N0677').get()
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_file = os.path.join(tmp_dir, str(randrange(100000)) + ".temp")
             mosmix.save(temp_file)
             restored_mosmix = MosmixS.load(temp_file)
             self.assertEqual(mosmix.station_id, restored_mosmix.station_id)
-            self.assertEqual(mosmix.__issue_time_utc, restored_mosmix.__issue_time_utc)
+            self.assertEqual(mosmix.issue_time, restored_mosmix.issue_time)
             self.assertEqual(mosmix.is_expired(), restored_mosmix.is_expired())
             time = datetime.now() + timedelta(days=5)
             self.assertEqual(mosmix.supports(time), restored_mosmix.supports(time))
@@ -33,7 +33,7 @@ class TestMosmix(unittest.TestCase):
             os.remove(temp_file)
 
     def test_utc_local_time(self):
-        mosmix = MosmixSWeb.load('N0677')
+        mosmix = MemoryCachedMosmixLoader('N0677').get()
 
         print("cross-check with https://mosmix.de/online.html#/station/N0677/")
         print("time (local) ............. time (utc) .............. vv")

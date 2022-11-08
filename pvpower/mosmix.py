@@ -9,7 +9,7 @@ from os.path import exists
 from stream_unzip import stream_unzip
 from random import randrange
 import pytz
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import xml.etree.ElementTree as ET
 
@@ -156,7 +156,9 @@ class MosmixS:
     def date_to(self) -> datetime:
         return MosmixS.__utc_to_local(self.__date_to_utc)
 
-    def merge(self, old_mosmix, min_local_datetime: datetime):
+    def merge(self, old_mosmix, min_local_datetime: datetime = None):
+        if min_local_datetime is None:
+            min_local_datetime = datetime.now() - timedelta(days=5)
         if old_mosmix is None:
             return self
         else:
@@ -165,34 +167,33 @@ class MosmixS:
                              old_mosmix.__date_from_utc,
                              self.__date_to_utc,
                              {parameter: self.__parameter_series[parameter].merge(old_mosmix.__parameter_series[parameter], min_local_datetime) for parameter in self.__parameter_series.keys()})
-            logging.debug("merging \nold mosmix: " + str(old_mosmix) + " \nnew mosmix: " + str(self) + " \n-> " + str(merged))
+            logging.debug("merging \nold mosmix:    " + str(old_mosmix) + " \nnew mosmix:    " + str(self) + " \nmerged mosmix: " + str(merged))
             return merged
 
     def is_expired(self) -> bool:
-        content_age_min = int((datetime.now(timezone.utc) - self.__issue_time_utc).total_seconds() / 60)
+        content_age_min = int((datetime.now() - self.issue_time).total_seconds() / 60)
         return content_age_min > (60 + 25 + randrange(15))
 
-    def supports(self, local_datetime: datetime) -> bool:
-        dt_utc = local_datetime.astimezone(pytz.UTC)
-        return self.__date_from_utc <= dt_utc <= self.__date_to_utc
+    def supports(self, dt: datetime) -> bool:
+        return self.date_from <= dt <= self.date_to
 
-    def rad1h(self, local_datetime: datetime) -> float:
-        return self.__parameter_series["Rad1h"].value_at(local_datetime)
+    def rad1h(self, dt: datetime) -> float:
+        return self.__parameter_series["Rad1h"].value_at(dt)
 
-    def sund1(self, local_datetime: datetime) -> float:
-        return self.__parameter_series["SunD1"].value_at(local_datetime)
+    def sund1(self, dt: datetime) -> float:
+        return self.__parameter_series["SunD1"].value_at(dt)
 
-    def neff(self, local_datetime: datetime) -> float:
-        return self.__parameter_series["Neff"].value_at(local_datetime)
+    def neff(self, dt: datetime) -> float:
+        return self.__parameter_series["Neff"].value_at(dt)
 
-    def wwm(self, local_datetime: datetime) -> float:
-        return self.__parameter_series["wwM"].value_at(local_datetime)
+    def wwm(self, dt: datetime) -> float:
+        return self.__parameter_series["wwM"].value_at(dt)
 
-    def vv(self, local_datetime: datetime) -> float:
-        return self.__parameter_series["VV"].value_at(local_datetime)
+    def vv(self, dt: datetime) -> float:
+        return self.__parameter_series["VV"].value_at(dt)
 
     def __str__(self):
-        return "issued=" + self.issue_time.strftime("%d.%m.%Y %H:%M") + " / " + str(self.__parameter_series["Rad1h"].size()) + " entries (" + self.date_from.strftime("%d.%m.%Y %H:%M") + " -> " + self.date_to.strftime("%d.%m.%Y %H:%M") + ")"
+        return str(self.__parameter_series["Rad1h"].size()) + " entries (issued=" + self.issue_time.strftime("%Y.%m.%dT%H:%M") + "; " + self.date_from.strftime("%Y.%m.%dT%H:%M") + " -> " + self.date_to.strftime("%Y.%m.%dT%H:%M") + ")"
 
     def save(self, filename: str = "mosmix.json"):
         with open(filename, "w") as file:
@@ -225,129 +226,83 @@ class MosmixS:
 
 
 
-
-
-class MosmixCache(ABC):
+class MosmixLoader(ABC):
 
     @abstractmethod
-    def put(self, station_id: str, mosmix: MosmixS):
-        return None
-
-    @abstractmethod
-    def get(self, station_id: str) -> Optional[MosmixS]:
-        return None
+    def get(self) -> MosmixS:
+        pass
 
 
-class MemoryBasedMosmixCache(MosmixCache):
+class MosmixWebLoader:
 
-    def __init__(self):
-        self.__cached_mosmix_map = {}
+    def __init__(self, station_id: str):
+        self.__station_id = station_id
 
-    def put(self, station_id, mosmix: MosmixS):
-        self.__cached_mosmix_map[station_id] = mosmix
+    @staticmethod
+    def __perform_get_chunked(url: str):
+        with httpx.stream('GET', url) as r:
+            yield from r.iter_bytes(chunk_size=65536)
 
-    def get(self, station_id) -> Optional[MosmixS]:
-        cached_mosmix = self.__cached_mosmix_map.get(station_id, None)
-        if cached_mosmix is None or cached_mosmix.is_expired():
-            return None
-        else:
-            return cached_mosmix
+    def get(self) -> MosmixS:
+        url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'
+
+        issue_time_collector = IssueTimeCollector()
+        timesteps_collector = TimeStepsCollector()
+        forecasts_collector = ForecastValuesCollector(self.__station_id)
+
+        xml_parser = ET.XMLPullParser(['start', 'end'])
+        for file_name, file_size, unzipped_chunks in stream_unzip(MosmixWebLoader.__perform_get_chunked(url)):
+            for chunk in unzipped_chunks:
+                xml_parser.feed(chunk)
+                for event, elem in xml_parser.read_events():
+                    issue_time_collector.consume(event, elem)
+                    timesteps_collector.consume(event, elem)
+                    forecasts_collector.consume(event, elem)
+        mosmix = MosmixS.create(self.__station_id,
+                                issue_time_collector.issue_time_utc,
+                                timesteps_collector.utc_timesteps,
+                                forecasts_collector.parameters)
+        logging.info("MosmixS file fetched " + str(mosmix))
+        return mosmix
 
 
-class FileBasedMosmixCache(MosmixCache):
 
-    def __init__(self, ):
+class FileCachedMosmixLoader(MosmixLoader):
+
+    def __init__(self, station_id: str):
+        self.__station_id = station_id
+        self.__parent_loader = MosmixWebLoader(self.__station_id)
         self.__dir = site_data_dir("pv_forecast", appauthor=False)
         if not exists(self.__dir):
             os.makedirs(self.__dir)
 
-    def __filename(self, station_id: str):
-        return os.path.join(self.__dir, "mosmixs_" + station_id + ".json")
-
-    def put(self, station_id, mosmix: MosmixS):
-        cache_filename = self.__filename(station_id)
-        mosmix.save(cache_filename)
-
-    def get(self, station_id) -> Optional[MosmixS]:
-        cache_filename = self.__filename(station_id)
+    def get(self) -> MosmixS:
+        cache_filename = os.path.join(self.__dir, "mosmixs_" + self.__station_id + ".json")
         cached_mosmix = MosmixS.load(cache_filename)
         if cached_mosmix is not None:
             if cached_mosmix.is_expired():
                 elasped_minutes_since_last_cache_refresh = int((time.time() - os.path.getmtime(cache_filename)) / 60)
                 if elasped_minutes_since_last_cache_refresh < 10:   # at maximum all 10 min the (large!) mosmix file will be loaded via web
-                    logging.debug("filebased mosmix cache is expired, however last refresh is < 10 min. return cached one")
+                    logging.debug("filebased mosmix cache is expired, however last refresh is < 10 min. return cached one -> " + str(cached_mosmix))
                     return cached_mosmix
             else:
                 return cached_mosmix
-        return None
+        mosmix = self.__parent_loader.get()
+        merged_mosmix = mosmix.merge(cached_mosmix)
+        merged_mosmix.save(cache_filename)
+        return merged_mosmix
 
 
-class TieredMosmixCache(ABC):
-
-    def __init__(self):
-        self.__in_memory_cache = MemoryBasedMosmixCache()
-        self.__file_cache = FileBasedMosmixCache()
-
-    def put(self, station_id: str, mosmix: MosmixS):
-        self.__in_memory_cache.put(station_id, mosmix)
-        self.__file_cache.put(station_id, mosmix)
-
-    def get(self, station_id: str) -> Optional[MosmixS]:
-        cached_mosmix = self.__in_memory_cache.get(station_id)
-        if cached_mosmix is None or cached_mosmix.is_expired():
-            logging.debug("in memory cache is expired, loading mosmix from filebased cache")
-            return self.__file_cache.get(station_id)
-        else:
-            return cached_mosmix
-
-
-
-class MosmixSWeb:
-
-    __cache = TieredMosmixCache()
-
-    # x-check https://mosmix.de/online.html#/station/10724/station
-    # parameters (https://dwd-geoportal.de/products/G_FJM/)
+class MemoryCachedMosmixLoader(MosmixLoader):
 
     def __init__(self, station_id: str):
-        self.station_id = station_id
-        self.__issue_time_collector = IssueTimeCollector()
-        self.__timesteps_collector = TimeStepsCollector()
-        self.__forecasts_collector = ForecastValuesCollector(station_id)
+        self.__parent_loader = FileCachedMosmixLoader(station_id)
+        self.__cached_mosmix = None
 
-    def consume(self, event, elem):
-        self.__issue_time_collector.consume(event, elem)
-        self.__timesteps_collector.consume(event, elem)
-        self.__forecasts_collector.consume(event, elem)
+    def get(self) -> MosmixS:
+        if self.__cached_mosmix is None or self.__cached_mosmix.is_expired():
+            mosmix = self.__parent_loader.get()
+            self.__cached_mosmix = mosmix
+        return self.__cached_mosmix
 
-    @staticmethod
-    def __perform_get_chunked(url):
-        with httpx.stream('GET', url) as r:
-            yield from r.iter_bytes(chunk_size=65536)
 
-    @staticmethod
-    def __load_from_web(station_id: str) -> MosmixS:
-        url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz'
-        mosmix_loader = MosmixSWeb(station_id)
-        xml_parser = ET.XMLPullParser(['start', 'end'])
-        for file_name, file_size, unzipped_chunks in stream_unzip(MosmixSWeb.__perform_get_chunked(url)):
-            for chunk in unzipped_chunks:
-                xml_parser.feed(chunk)
-                for event, elem in xml_parser.read_events():
-                    mosmix_loader.consume(event, elem)
-        return MosmixS.create(station_id,
-                              mosmix_loader.__issue_time_collector.issue_time_utc,
-                              mosmix_loader.__timesteps_collector.utc_timesteps,
-                              mosmix_loader.__forecasts_collector.parameters)
-
-    @staticmethod
-    def load(station_id: str) -> MosmixS:
-        # load cached mosmix
-        cached_mosmix = MosmixSWeb.__cache.get(station_id)
-        if cached_mosmix is not None:
-            return cached_mosmix
-        else:   # no valid cache entry
-            mosmix = MosmixSWeb.__load_from_web(station_id)
-            mosmix = mosmix.merge(cached_mosmix, datetime.now() - timedelta(days=1))
-            MosmixSWeb.__cache.put(station_id, mosmix)
-            return mosmix

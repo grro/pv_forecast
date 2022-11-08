@@ -1,7 +1,7 @@
 import logging
 import pytz
 from datetime import datetime
-from pvpower.mosmix import MosmixSWeb
+from pvpower.mosmix import MemoryCachedMosmixLoader
 from typing import Optional
 
 
@@ -45,32 +45,26 @@ class WeatherForecast:
 class WeatherStation:
 
     def __init__(self, station: str):
-        self.__station = station
-        self.__mosmix = MosmixSWeb.load(self.__station)
+        self.__mosmix_loader = MemoryCachedMosmixLoader(station)
 
     def forcast_from(self) -> datetime:
-        return self.__mosmix.date_from
+        return self.__mosmix_loader.get().date_from
 
     def forcast_to(self) -> datetime:
-        return self.__mosmix.date_to
+        return self.__mosmix_loader.get().date_to
 
     def forecast(self, time: datetime = None) -> Optional[WeatherForecast]:
         time = time if time is not None else datetime.now()
 
-        if self.__mosmix.is_expired():
-            mosmix = MosmixSWeb.load(self.__station)
-            if mosmix.date_from > self.__mosmix.date_from:
-                self.__mosmix = mosmix
-                logging.info("updated mosmix file loaded")
-
-        if self.__mosmix.supports(time):
+        mosmix = self.__mosmix_loader.get()
+        if mosmix.supports(time):
             forecast = WeatherForecast(time,
-                                       round(self.__mosmix.rad1h(time)),
-                                       round(self.__mosmix.sund1(time)),
-                                       round(self.__mosmix.neff(time)),
-                                       round(self.__mosmix.wwm(time)),
-                                       round(self.__mosmix.vv(time)))
+                                       round(mosmix.rad1h(time)),
+                                       round(mosmix.sund1(time)),
+                                       round(mosmix.neff(time)),
+                                       round(mosmix.wwm(time)),
+                                       round(mosmix.vv(time)))
             return forecast
         else:
-            logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None")
+            logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None (current mosmix: " + str(self.__mosmix) + ")")
             return None
