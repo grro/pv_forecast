@@ -79,7 +79,7 @@ class LabelledWeatherForecast(WeatherForecast):
 
 
 class TrainSampleLog:
-    COMPACTION_PERIOD_DAYS = 10
+    COMPACTION_PERIOD_DAYS = 15
 
     def __init__(self, dirname: str):
         self.lock = RLock()
