@@ -66,5 +66,5 @@ class WeatherStation:
                                        round(mosmix.vv(time)))
             return forecast
         else:
-            logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None (current mosmix: " + str(self.__mosmix) + ")")
+            logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None (current mosmix: " + str(mosmix) + ")")
             return None
