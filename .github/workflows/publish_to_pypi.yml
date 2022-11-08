@@ -25,6 +25,7 @@ jobs:
           python -m build
       - name: Test with pytest
         run: |
+          pip install pytest
           pytest
       - name:  Publish distribution 📦 to PyPI
         if: startsWith(github.ref, 'refs/tags')
