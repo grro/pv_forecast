@@ -1,4 +1,6 @@
 import logging
+import pickle
+from os import path
 from appdirs import site_data_dir
 from threading import Thread
 from datetime import datetime, timedelta
@@ -77,19 +79,37 @@ class ValueRecorder:
 
 class PvPowerForecast:
 
-    def __init__(self, station_id: str, train_dir: str = None, estimator: Estimator = None):
-        if train_dir is None:
-            train_dir = site_data_dir("pv_forecast", appauthor=False)
+    def __init__(self, station_id: str, pv_forecast_dir: str = None, estimator: Estimator = None):
+        if pv_forecast_dir is None:
+            self.__pv_forecast_dir = site_data_dir("pv_forecast", appauthor=False)
+        else:
+            self.__pv_forecast_dir = pv_forecast_dir
+        self.train_log = TrainSampleLog(self.__pv_forecast_dir)
         self.weather_forecast_service = WeatherStation(station_id)
-        self.train_log = TrainSampleLog(train_dir)
         self.__train_value_recorder = ValueRecorder()
-        self.__date_last_retrain = datetime.now() - timedelta(days=90)
-        self.__date_best_estimator_selected = datetime.now() - timedelta(days=90)
         if estimator is None:
-            self.__estimator = Estimator()
+            self.__estimator = self.__load_default_estimator()
         else:
             self.__estimator = estimator
-        self.__retrain()
+        self.__date_last_retrain = self.__estimator.date_last_train
+        self.__retrain_if_old(False)
+
+    def __load_default_estimator(self):
+        try:
+            with open(path.join(self.__pv_forecast_dir, 'default_estimator.pickle'), 'rb') as file:
+                estimator = pickle.load(file)
+                logging.debug("default estimator " + str(estimator) + " loaded from pickle file")
+        except Exception as e:
+            estimator = Estimator()
+            logging.debug("default estimator " + str(estimator) + " created")
+        return  estimator
+
+    def __store_default_estimator(self):
+        try:
+            with open(path.join(self.__pv_forecast_dir, 'default_estimator.pickle'), 'wb') as file:
+                pickle.dump(self.__estimator, file)
+        except Exception as e:
+            pass
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -120,14 +140,24 @@ class PvPowerForecast:
         try:
             return self.__estimator.predict(sample)
         finally:
-            # retrain, if necessary
-            if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
-                self.__date_last_retrain = datetime.now()
+            self.__retrain_if_old()
+
+    def __retrain_if_old(self, background: bool = True):
+        if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
+            self.__date_last_retrain = datetime.now()
+            if background:
                 Thread(target=self.__retrain, daemon=True).start()
+            else:
+                self.__retrain()
 
     def __retrain(self):
         try:
             self.__estimator.retrain(self.train_log.all())
             logging.info("estimator retrained " + str(self.__estimator))
+            self.__store_default_estimator()
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
+
+
+    def __str__(self):
+        return str(self.__estimator)

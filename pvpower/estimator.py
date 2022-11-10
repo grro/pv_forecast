@@ -193,6 +193,7 @@ class Estimator:
             self.__vectorizer = CoreVectorizer()
         else:
             self.__vectorizer = vectorizer
+        self.date_last_train = datetime.fromtimestamp(0)
         self.num_samples_last_train = 0
         self.num_covered_days_last_train = 0
         self.__score = None
@@ -212,6 +213,7 @@ class Estimator:
         label_list = [sample.power_watt for sample in cleaned_samples]
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
+            self.date_last_train = datetime.now()
             self.num_samples_last_train = len(cleaned_samples)
             self.num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in cleaned_samples]))
         return TrainReport(cleaned_samples)

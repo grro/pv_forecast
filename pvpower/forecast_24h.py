@@ -89,8 +89,9 @@ class TimeFrames:
 
 class Next24hours:
 
-    def __init__(self, predicted_power: Dict[datetime, LabelledWeatherForecast]):
-        self.predicted_power = predicted_power
+    def __init__(self, pv_forecast: PvPowerForecast, predicted_power: Dict[datetime, LabelledWeatherForecast]):
+        self.__predicted_power = predicted_power
+        self.__pv_forecast = pv_forecast
 
     @staticmethod
     def __round_hour(dt: datetime) -> datetime:
@@ -105,10 +106,10 @@ class Next24hours:
                 predicted_value = pv_forecast.predict_by_weather_forecast(weather_forecast)
                 if predicted_value is not None:
                     predicted_power[Next24hours.__round_hour(weather_forecast.time)] = LabelledWeatherForecast.create(weather_forecast, predicted_value)
-        return Next24hours(predicted_power)
+        return Next24hours(pv_forecast, predicted_power)
 
     def __prediction_values(self) -> List[int]:
-        return [forecast.power_watt for forecast in self.predicted_power.values() if forecast.time <= (datetime.now() + timedelta(hours=24))]
+        return [forecast.power_watt for forecast in self.__predicted_power.values() if forecast.time <= (datetime.now() + timedelta(hours=24))]
 
     def peek(self) -> int:
         return max(self.__prediction_values())
@@ -116,8 +117,8 @@ class Next24hours:
     def peek_time(self) -> datetime:
         peek_time = None
         peek_value = 0
-        for dt in self.predicted_power.keys():
-            forecast = self.predicted_power[dt]
+        for dt in self.__predicted_power.keys():
+            forecast = self.__predicted_power[dt]
             if forecast.power_watt > peek_value:
                 peek_value = forecast.power_watt
                 peek_time = dt
@@ -128,9 +129,9 @@ class Next24hours:
 
     def frames(self, width_hours: int = 1) -> TimeFrames:
         frames = []
-        times = list(self.predicted_power.keys())
+        times = list(self.__predicted_power.keys())
         for offset_hour in range(0, 24+width_hours):
-            forecasts = [self.predicted_power[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
+            forecasts = [self.__predicted_power[times[idx]] for idx in range(offset_hour, offset_hour + width_hours)]
             frame = TimeFrame(forecasts)
             frames.append(frame)
         frames = [frame for frame in frames if frame.start_time <= (datetime.now() + timedelta(hours=24))]
@@ -138,13 +139,13 @@ class Next24hours:
 
     def __str__(self):
         txt = "time ................ pv power ..... irradiance ....... sunshine .... visibility .... fog probab. .... cloud cover\n"
-        for time in list(self.predicted_power.keys())[:24]:
-            power = str(round(self.predicted_power[time].power_watt))
-            irradiance = str(round(self.predicted_power[time].irradiance))
-            visibility = str(round(self.predicted_power[time].visibility))
-            sunshine = str(round(self.predicted_power[time].sunshine))
-            probability_for_fog = str(round(self.predicted_power[time].probability_for_fog))
-            cloud_cover = str(round(self.predicted_power[time].cloud_cover))
+        for time in list(self.__predicted_power.keys())[:24]:
+            power = str(round(self.__predicted_power[time].power_watt))
+            irradiance = str(round(self.__predicted_power[time].irradiance))
+            visibility = str(round(self.__predicted_power[time].visibility))
+            sunshine = str(round(self.__predicted_power[time].sunshine))
+            probability_for_fog = str(round(self.__predicted_power[time].probability_for_fog))
+            cloud_cover = str(round(self.__predicted_power[time].cloud_cover))
             txt += time.strftime("%d %b, %H:%M") + " " + \
                    "".join(["."] * (10 - len(power))) + " " + power + " watt " + \
                    "".join(["."] * (15 - len(irradiance))) + " " + irradiance + " " + \
@@ -152,6 +153,7 @@ class Next24hours:
                    "".join(["."] * (15 - len(visibility))) + " " + visibility + " " + \
                    "".join(["."] * (15 - len(probability_for_fog))) + " " + probability_for_fog +  " " + \
                    "".join(["."] * (15 - len(cloud_cover))) + " " + cloud_cover + "\n"
+        txt += str(self.__pv_forecast) + "\n"
         return txt
 
 
