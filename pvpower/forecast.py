@@ -4,49 +4,10 @@ from os import path
 from appdirs import site_data_dir
 from threading import Thread
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
-from pvpower.estimator import Estimator
-from pvpower.estimator import CoreVectorizer,PlusVisibilityVectorizer
-from pvpower.estimator import PlusVisibilityCloudCoverVectorizer, PlusCloudCoverVectorizer, PlusSunshineVectorizer
-from pvpower.estimator import PlusVisibilitySunshineVectorizer, PlusVisibilityFogCloudCoverVectorizer, FullVectorizer
-
-
-class Trainer:
-
-    def select_best_estimator(self, train_log: TrainSampleLog, num_rounds: int = 5) -> Estimator:
-        samples = train_log.all()
-
-        vectorizer_map = {
-            "core": CoreVectorizer(),
-            "+visibility": PlusVisibilityVectorizer(),
-            "+sunshine": PlusSunshineVectorizer(),
-            "+cloudcover": PlusCloudCoverVectorizer(),
-            "+visibility +sunshine": PlusVisibilitySunshineVectorizer(),
-            "+visibility +cloudcover": PlusVisibilityCloudCoverVectorizer(),
-            "+visibility +fog +cloudcover": PlusVisibilityFogCloudCoverVectorizer(),
-            "+visibility +fog +cloudcover +sunshine": FullVectorizer(),
-        }
-
-        lowest_score = 10000
-        best_estimator = Estimator(CoreVectorizer())
-
-        days = len(set([sample.time.strftime("%Y.%m.%d") for sample in samples]))
-        report = "tested with " + str(len(samples)) + " cleaned samples (" + str(days) + " days; " + str(num_rounds) + " test rounds per variant)" + "\n"
-        report += "VARIANT ............................ DERIVATION\n"
-        for variant, vectorizer in vectorizer_map.items():
-            estimator = Estimator(vectorizer)
-            median_report = estimator.test(samples, rounds=num_rounds)
-            score_str = str(round(median_report.score, 1))
-            report += variant + " " + "".join(["."] * (45 - (len(variant)+len(score_str)))) + " " + score_str + "\n"
-            if median_report.score < lowest_score:
-                best_estimator = estimator
-                lowest_score = median_report.score
-        logging.info(report)
-        best_estimator.retrain(samples)
-        return best_estimator
-
+from pvpower.estimator import Estimator, SMVEstimator, TrainReport
 
 
 class ValueRecorder:
@@ -77,39 +38,60 @@ class ValueRecorder:
         return self.__start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.__end_time.strftime("%Y.%m.%d %H:%M") + "  average power: " + str(self.average) + " num probes: " + str(len(self.__power_values))
 
 
-class PvPowerForecast:
 
-    def __init__(self, station_id: str, pv_forecast_dir: str = None, estimator: Estimator = None):
-        if pv_forecast_dir is None:
-            self.__pv_forecast_dir = site_data_dir("pv_forecast", appauthor=False)
-        else:
-            self.__pv_forecast_dir = pv_forecast_dir
-        self.train_log = TrainSampleLog(self.__pv_forecast_dir)
-        self.weather_forecast_service = WeatherStation(station_id)
-        self.__train_value_recorder = ValueRecorder()
-        if estimator is None:
-            self.__estimator = self.__load_default_estimator()
-        else:
-            self.__estimator = estimator
-        self.__date_last_retrain = self.__estimator.date_last_train
-        self.__retrain_if_old(False)
+class DefaultEstimator(Estimator):
 
-    def __load_default_estimator(self):
-        try:
-            with open(path.join(self.__pv_forecast_dir, 'default_estimator.pickle'), 'rb') as file:
-                estimator = pickle.load(file)
-                logging.debug("default estimator " + str(estimator) + " loaded from pickle file")
-        except Exception as e:
-            estimator = Estimator()
-            logging.debug("default estimator " + str(estimator) + " created")
-        return  estimator
+    def __init__(self, estimator: Estimator, pv_forecast_dir: str):
+        self.__estimator = estimator
+        self.__pv_forecast_dir = pv_forecast_dir
 
-    def __store_default_estimator(self):
+    def date_last_train(self) -> datetime:
+        return self.__estimator.date_last_train()
+
+    def predict(self, sample: WeatherForecast) -> int:
+        return self.__estimator.predict(sample)
+
+    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
+        train_report = self.__estimator.retrain(samples)
+        self.__store()
+        return train_report
+
+    def __store(self):
         try:
             with open(path.join(self.__pv_forecast_dir, 'default_estimator.pickle'), 'wb') as file:
                 pickle.dump(self.__estimator, file)
         except Exception as e:
             pass
+
+    @staticmethod
+    def get(pv_forecast_dir: str):
+        try:
+            with open(path.join(pv_forecast_dir, 'default_estimator.pickle'), 'rb') as file:
+                estimator = DefaultEstimator(pickle.load(file), pv_forecast_dir)
+                logging.debug("default estimator " + str(estimator) + " loaded from pickle file")
+        except Exception as e:
+            estimator = DefaultEstimator(SMVEstimator(), pv_forecast_dir)
+            estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
+            logging.debug("default estimator " + str(estimator) + " created and trained")
+        return estimator
+
+    def __str__(self):
+        return str(self.__estimator)
+
+class PvPowerForecast:
+
+    def __init__(self, station_id: str, pv_forecast_dir: str = None, estimator: Estimator = None):
+        if pv_forecast_dir is None:
+            pv_forecast_dir = site_data_dir("pv_forecast", appauthor=False)
+        self.train_log = TrainSampleLog(pv_forecast_dir)
+        self.weather_forecast_service = WeatherStation(station_id)
+        self.__train_value_recorder = ValueRecorder()
+        if estimator is None:
+            self.__estimator = DefaultEstimator.get(pv_forecast_dir)
+        else:
+            self.__estimator = estimator
+        self.__date_last_retrain = self.__estimator.date_last_train()
+        self.__train_if_old(False)
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -120,8 +102,7 @@ class PvPowerForecast:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
                                                                           self.__train_value_recorder.average,
                                                                           time=self.__train_value_recorder.time)
-                        if self.__estimator.usable_as_train_sample(annotated_sample):
-                            self.train_log.append(annotated_sample)
+                        self.train_log.append(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()
         self.__train_value_recorder.add(real_power)
@@ -140,24 +121,15 @@ class PvPowerForecast:
         try:
             return self.__estimator.predict(sample)
         finally:
-            self.__retrain_if_old()
+            self.__train_if_old()
 
-    def __retrain_if_old(self, background: bool = True):
+    def __train_if_old(self, background: bool = True):
         if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
             self.__date_last_retrain = datetime.now()
             if background:
-                Thread(target=self.__retrain, daemon=True).start()
+                Thread(target=self.__estimator.retrain, daemon=True, args=(self.train_log.all(),)).start()
             else:
-                self.__retrain()
-
-    def __retrain(self):
-        try:
-            self.__estimator.retrain(self.train_log.all())
-            logging.info("estimator retrained " + str(self.__estimator))
-            self.__store_default_estimator()
-        except Exception as e:
-            logging.warning("error occurred retrain prediction model " + str(e))
-
+                self.__estimator.retrain(self.train_log.all())
 
     def __str__(self):
         return str(self.__estimator)

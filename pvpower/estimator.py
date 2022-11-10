@@ -185,7 +185,22 @@ class TestReport:
         return txt
 
 
-class Estimator:
+class Estimator(ABC):
+
+    @abstractmethod
+    def date_last_train(self) -> datetime:
+        pass
+
+    @abstractmethod
+    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
+        pass
+
+    @abstractmethod
+    def predict(self, sample: WeatherForecast) -> int:
+        pass
+
+
+class SMVEstimator(Estimator):
 
     def __init__(self, vectorizer: Vectorizer = None):
         self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
@@ -193,59 +208,33 @@ class Estimator:
             self.__vectorizer = CoreVectorizer()
         else:
             self.__vectorizer = vectorizer
-        self.date_last_train = datetime.fromtimestamp(0)
-        self.num_samples_last_train = 0
-        self.num_covered_days_last_train = 0
+        self.__date_last_train = datetime.fromtimestamp(0)
+        self.__num_samples_last_train = 0
+        self.__num_covered_days_last_train = 0
         self.__score = None
 
-    def usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
+    def __usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
         return sample.irradiance > 0
 
-    def clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
+    def date_last_train(self) -> datetime:
+        return self.__date_last_train
+
+    def __clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
         samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))
-        samples = [sample for sample in samples if self.usable_as_train_sample(sample)]
+        samples = [sample for sample in samples if self.__usable_as_train_sample(sample)]
         return samples
 
     def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
-        cleaned_samples = self.clean_data(samples)
+        cleaned_samples = self.__clean_data(samples)
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in cleaned_samples]
         label_list = [sample.power_watt for sample in cleaned_samples]
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
-            self.date_last_train = datetime.now()
-            self.num_samples_last_train = len(cleaned_samples)
-            self.num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in cleaned_samples]))
+            self.__date_last_train = datetime.now()
+            self.__num_samples_last_train = len(cleaned_samples)
+            self.__num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in cleaned_samples]))
         return TrainReport(cleaned_samples)
-
-    def test(self, samples: List[LabelledWeatherForecast], rounds: int = 10) -> TestReport:
-        test_reports = []
-        test_estimator = Estimator(self.__vectorizer)
-        cleaned_samples = test_estimator.clean_data(samples)
-
-        step_width = int(len(cleaned_samples) / rounds)
-        if step_width < 1:
-            step_width = 1
-        for i in range(0, rounds):
-            # split test data
-            num_train_samples = int(len(cleaned_samples) * 0.65)
-            train_samples = cleaned_samples[0: num_train_samples]
-            validation_samples = cleaned_samples[num_train_samples:]
-
-            # train and test
-            train_report = test_estimator.retrain(train_samples)
-            predicted = [test_estimator.predict(test_sample) for test_sample in validation_samples]
-            test_reports.append(TestReport(train_report, validation_samples, predicted))
-
-            cleaned_samples = cleaned_samples[-step_width:] + cleaned_samples[:-step_width]
-
-        test_reports.sort(key=lambda report: report.score)
-        median_report = test_reports[int(len(test_reports)*0.5)]
-        self.__score = median_report.score
-        return median_report
-
-    def __str__(self):
-        return "Estimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.num_samples_last_train) + " samples; " + str(self.num_covered_days_last_train) + " days)"
 
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:
@@ -259,3 +248,7 @@ class Estimator:
                 return 0
         else:
             return 0
+
+    def __str__(self):
+        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples " + str(round((datetime.now() - self.date_last_train()).total_seconds() / 60,0)) +" minutes ago, time range: " + str(self.__num_covered_days_last_train) + " days)"
+
