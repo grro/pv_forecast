@@ -1,7 +1,7 @@
 import logging
 import pickle
-from os import path
-from appdirs import site_data_dir
+from os import path, makedirs
+from appdirs import site_data_dir, user_cache_dir
 from threading import Thread
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -45,6 +45,13 @@ class DefaultEstimator(Estimator):
         self.__estimator = estimator
         self.__pv_forecast_dir = pv_forecast_dir
 
+    @staticmethod
+    def __filename() -> str:
+        dir = user_cache_dir("pv_forecast", appauthor=False)
+        if not path.exists(dir):
+            makedirs(dir)
+        return path.join(dir, 'dflt_estimator.pickle')
+
     def date_last_train(self) -> datetime:
         return self.__estimator.date_last_train()
 
@@ -58,7 +65,7 @@ class DefaultEstimator(Estimator):
 
     def __store(self):
         try:
-            with open(path.join(self.__pv_forecast_dir, 'default_estimator.pickle'), 'wb') as file:
+            with open(self.__filename(), 'wb') as file:
                 pickle.dump(self.__estimator, file)
         except Exception as e:
             pass
@@ -66,9 +73,9 @@ class DefaultEstimator(Estimator):
     @staticmethod
     def get(pv_forecast_dir: str):
         try:
-            with open(path.join(pv_forecast_dir, 'default_estimator.pickle'), 'rb') as file:
+            with open(DefaultEstimator.__filename(), 'rb') as file:
                 estimator = DefaultEstimator(pickle.load(file), pv_forecast_dir)
-                logging.debug("default estimator " + str(estimator) + " loaded from pickle file")
+                logging.debug("default estimator " + str(estimator) + " loaded from pickle file (" + DefaultEstimator.__filename() + ")")
         except Exception as e:
             estimator = DefaultEstimator(SMVEstimator(), pv_forecast_dir)
             estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
