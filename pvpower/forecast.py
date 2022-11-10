@@ -77,7 +77,7 @@ class ValueRecorder:
 
 class PvPowerForecast:
 
-    def __init__(self, station_id: str, train_dir: str = None):
+    def __init__(self, station_id: str, train_dir: str = None, estimator: Estimator = None):
         if train_dir is None:
             train_dir = site_data_dir("pv_forecast", appauthor=False)
         self.weather_forecast_service = WeatherStation(station_id)
@@ -85,7 +85,10 @@ class PvPowerForecast:
         self.__train_value_recorder = ValueRecorder()
         self.__date_last_retrain = datetime.now() - timedelta(days=90)
         self.__date_best_estimator_selected = datetime.now() - timedelta(days=90)
-        self.__estimator = Estimator(CoreVectorizer())
+        if estimator is None:
+            self.__estimator = Estimator()
+        else:
+            self.__estimator = estimator
         self.__retrain()
 
     def add_current_power_reading(self, real_power: int):
@@ -120,11 +123,7 @@ class PvPowerForecast:
             # retrain, if necessary
             if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
                 self.__date_last_retrain = datetime.now()
-                if datetime.now() > (self.__date_best_estimator_selected + timedelta(days=30)):  # each 1 month
-                    self.__date_best_estimator_selected = datetime.now()
-                    Thread(target=self.__update_with_best_estimator, daemon=True).start()
-                else:
-                    Thread(target=self.__retrain, daemon=True).start()
+                Thread(target=self.__retrain, daemon=True).start()
 
     def __retrain(self):
         try:
@@ -132,7 +131,3 @@ class PvPowerForecast:
             logging.info("estimator retrained " + str(self.__estimator))
         except Exception as e:
             logging.warning("error occurred retrain prediction model " + str(e))
-
-    def __update_with_best_estimator(self):
-        self.__estimator = Trainer().select_best_estimator(self.train_log)
-        logging.info("update estimator with best estimator variant " + str(self.__estimator))

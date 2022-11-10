@@ -187,9 +187,12 @@ class TestReport:
 
 class Estimator:
 
-    def __init__(self, vectorizer: Vectorizer):
+    def __init__(self, vectorizer: Vectorizer = None):
         self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        self.__vectorizer = vectorizer
+        if vectorizer is None:
+            self.__vectorizer = CoreVectorizer()
+        else:
+            self.__vectorizer = vectorizer
         self.num_samples_last_train = 0
         self.num_covered_days_last_train = 0
         self.__score = None
