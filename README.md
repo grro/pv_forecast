@@ -60,6 +60,7 @@ from pvpower.forecast_24h import Next24hours
 power_forecast = PvPowerForecast('L160')
 next24h = Next24hours.of(power_forecast)
 peek_watt = next24h.peek()
+peek_time = next24h.peek_time()
 ...
 ```
 

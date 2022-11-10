@@ -237,7 +237,6 @@ class MosmixWebLoader:
                                 issue_time_collector.issue_time_utc,
                                 timesteps_collector.utc_timesteps,
                                 forecasts_collector.parameters)
-        logging.info("MosmixS file fetched " + str(mosmix))
         return mosmix
 
 
@@ -262,6 +261,7 @@ class FileCachedMosmixLoader(MosmixLoader):
         new_mosmix = self.__parent_loader.get()
         merged_mosmix = new_mosmix.merge(mosmix)
         merged_mosmix.save(cache_filename)
+        logging.info("Mosmix file updated " + str(merged_mosmix))
         return merged_mosmix
 
 
