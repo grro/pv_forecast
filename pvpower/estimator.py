@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from sklearn import svm
 from typing import List
 from pvpower.weather_forecast import WeatherForecast
-from pvpower.traindata import LabelledWeatherForecast
+from pvpower.traindata import LabelledWeatherForecast, TrainData
 
 
 
@@ -41,6 +41,28 @@ class CoreVectorizer(Vectorizer):
 
     def __str__(self):
         return "CoreVectorizer"
+
+
+class SunshineVectorizer(Vectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        vectorized = [self._scale(sample.time_utc.month, 12),
+                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(sample.sunshine, 5000)]
+        return vectorized
+
+    def __str__(self):
+        return "SunshineVectorizer"
+
+
+class SushinePlusCloudCoverVectorizer(SunshineVectorizer):
+
+    def vectorize(self, sample: WeatherForecast) -> List[float]:
+        return super().vectorize(sample) +  [self._scale(sample.cloud_cover, 200)]
+
+    def __str__(self):
+        return "Sunshine+CloudVectorizer"
+
 
 
 class PlusVisibilityVectorizer(CoreVectorizer):
@@ -192,7 +214,7 @@ class Estimator(ABC):
         pass
 
     @abstractmethod
-    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
+    def retrain(self, train_data: TrainData) -> TrainReport:
         pass
 
     @abstractmethod
@@ -213,42 +235,38 @@ class SMVEstimator(Estimator):
         self.__num_covered_days_last_train = 0
         self.__score = None
 
-    def __usable_as_train_sample(self, sample: LabelledWeatherForecast) -> bool:
-        return sample.irradiance > 0
-
     def date_last_train(self) -> datetime:
         return self.__date_last_train
 
-    def __clean_data(self, samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
-        seen = list()
-        samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))
-        samples = [sample for sample in samples if self.__usable_as_train_sample(sample)]
-        return samples
-
-    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
-        cleaned_samples = self.__clean_data(samples)
-        feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in cleaned_samples]
-        label_list = [sample.power_watt for sample in cleaned_samples]
+    def retrain(self, train_data: TrainData) -> TrainReport:
+        samples = train_data.samples
+        feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
+        label_list = [sample.power_watt for sample in samples]
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
             self.__date_last_train = datetime.now()
-            self.__num_samples_last_train = len(cleaned_samples)
-            self.__num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in cleaned_samples]))
-        return TrainReport(cleaned_samples)
+            self.__num_samples_last_train = len(samples)
+            self.__num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in samples]))
+            logging.debug("estimator has been (re)trained " + str(self))
+        return TrainReport(samples)
 
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:
-            feature_vector = self.__vectorizer.vectorize(sample)
-            predicted = int(self.__clf.predict([feature_vector])[0])
-            #logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
-            if predicted >= 0:
-                return predicted
-            else:
-                logging.debug("predicted value is " + str(predicted) + " correct them to 0")
+            if self.__num_samples_last_train < 1:
+                logging.warning("estimator has not been trained (insufficient train data available). returning 0")
                 return 0
+            else:
+                feature_vector = self.__vectorizer.vectorize(sample)
+                predicted = int(self.__clf.predict([feature_vector])[0])
+                #logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
+                if predicted >= 0:
+                    return predicted
+                else:
+                    logging.debug("predicted value is " + str(predicted) + " correct them to 0")
+                    return 0
         else:
             return 0
 
     def __str__(self):
-        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples " + str(round((datetime.now() - self.date_last_train()).total_seconds() / 60,0)) +" minutes ago, time range: " + str(self.__num_covered_days_last_train) + " days)"
+        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days)"
 

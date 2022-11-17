@@ -4,9 +4,9 @@ from os import path, makedirs
 from appdirs import site_data_dir, user_cache_dir
 from threading import Thread
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
-from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
+from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog, TrainData
 from pvpower.estimator import Estimator, SMVEstimator, TrainReport
 
 
@@ -58,8 +58,8 @@ class DefaultEstimator(Estimator):
     def predict(self, sample: WeatherForecast) -> int:
         return self.__estimator.predict(sample)
 
-    def retrain(self, samples: List[LabelledWeatherForecast]) -> TrainReport:
-        train_report = self.__estimator.retrain(samples)
+    def retrain(self, train_data: TrainData) -> TrainReport:
+        train_report = self.__estimator.retrain(train_data)
         self.__store()
         return train_report
 
@@ -75,7 +75,8 @@ class DefaultEstimator(Estimator):
         try:
             with open(DefaultEstimator.__filename(), 'rb') as file:
                 estimator = DefaultEstimator(pickle.load(file), pv_forecast_dir)
-                logging.debug("default estimator " + str(estimator) + " loaded from pickle file (" + DefaultEstimator.__filename() + ")")
+                estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
+                logging.debug("default estimator " + str(estimator) + " loaded from pickle file (" + DefaultEstimator.__filename() + ") and retrained")
         except Exception as e:
             estimator = DefaultEstimator(SMVEstimator(), pv_forecast_dir)
             estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
@@ -131,7 +132,7 @@ class PvPowerForecast:
             self.__train_if_old()
 
     def __train_if_old(self, background: bool = True):
-        if datetime.now() > (self.__date_last_retrain + timedelta(minutes=23*60)):  # each 25 hours
+        if datetime.now() > (self.__date_last_retrain + timedelta(minutes=3*60)):
             self.__date_last_retrain = datetime.now()
             if background:
                 Thread(target=self.__estimator.retrain, daemon=True, args=(self.train_log.all(),)).start()

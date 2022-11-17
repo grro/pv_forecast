@@ -156,7 +156,7 @@ class MosmixS:
 
     def is_expired(self) -> bool:
         content_age_min = int((datetime.now() - self.issue_time).total_seconds() / 60)
-        return content_age_min > (60 + 25 + randrange(15))
+        return content_age_min > (60 + 25 + randrange(5))
 
     def supports(self, dt: datetime) -> bool:
         return self.date_from <= dt <= self.date_to

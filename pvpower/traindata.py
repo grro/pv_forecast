@@ -10,8 +10,9 @@ from pathlib import Path
 from os.path import exists
 from threading import RLock
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pvpower.weather_forecast import WeatherForecast
+
 
 
 class LabelledWeatherForecast(WeatherForecast):
@@ -78,6 +79,45 @@ class LabelledWeatherForecast(WeatherForecast):
         return sample
 
 
+class TrainData:
+
+    def __init__(self, samples: List[LabelledWeatherForecast]):
+        self.samples = self.__clean_data(samples)
+
+    def __iter__(self):
+        return iter(self.samples)
+
+    def __len__(self):
+        return len(self.samples)
+
+    @staticmethod
+    def __clean_data(samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
+        seen = list()
+        samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))
+        samples = [sample for sample in samples if sample.irradiance > 0]
+        return samples
+
+    @staticmethod
+    def __rotate(samples: List[LabelledWeatherForecast], offset_percent: int) -> List[LabelledWeatherForecast]:
+        step = int(offset_percent * len(samples) / 100)
+        return samples[step:] + samples[:step]
+
+    def split(self, ratio_percent:int = 67, offset_percent: int = 0):
+        rotated_samples = self.__rotate(self.samples, offset_percent)
+        size = len(rotated_samples)
+        left = []
+        right = []
+        for i in range(0, size):
+            if i > round(size * ratio_percent / 100, 0):
+                right.append(rotated_samples[i])
+            else:
+                left.append(rotated_samples[i])
+        return TrainData(left), TrainData(right)
+
+    def __str__(self):
+        return "train data size " + str(len(self.samples)) + " (" + self.samples[0].time.strftime("%Y.%m.%dT%H:%M") + " ... " + self.samples[-1].time.strftime("%Y.%m.%dT%H:%M") + ")"
+
+
 class TrainSampleLog:
     COMPACTION_PERIOD_DAYS = 15
 
@@ -109,7 +149,7 @@ class TrainSampleLog:
             self.__last_compaction_time = datetime.now()
             Thread(target=self.compact, args=(15,), daemon=True).start()
 
-    def all(self) -> List[LabelledWeatherForecast]:
+    def all(self) -> TrainData:
         with self.lock:
             # plain file
             fn = self.filename()
@@ -123,7 +163,7 @@ class TrainSampleLog:
                                 samples.append(LabelledWeatherForecast.from_csv(line))
                             except Exception as e:
                                 logging.warning(e)
-                        return samples
+                        return TrainData(samples)
                 except Exception as e:
                     logging.warning("error occurred loading " + fn + " " + str(e))
 
@@ -139,26 +179,26 @@ class TrainSampleLog:
                                 samples.append(LabelledWeatherForecast.from_csv(line))
                             except Exception as e:
                                 pass
-                        return samples
+                        return TrainData(samples)
                 except Exception as e:
                     logging.warning("error occurred loading " + compr_fn + " " + str(e))
-        return []
+        return TrainData([])
 
     def compact(self, delay_sec:int = 0):
         sleep(delay_sec)
 
         fn = self.filename(compressed=True)
-        samples = self.all()
+        train_data = self.all()
         min_datetime = datetime.now() - timedelta(days=400)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_file = os.path.join(tmp_dir, 'traindata.csv')
             with gzip.open(temp_file, "wb") as file:
                 file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
-                num_samples = len(samples)
+                num_samples = len(train_data)
                 num_survived = 0
                 previous_sample = None
-                for sample in samples:
+                for sample in train_data:
                     expired = sample.time_utc < min_datetime.astimezone(pytz.UTC)
                     duplicate = False
                     if previous_sample is not None:
