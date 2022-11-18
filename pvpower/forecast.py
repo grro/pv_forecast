@@ -12,7 +12,7 @@ from pvpower.estimator import Estimator, SMVEstimator, TrainReport
 
 class ValueRecorder:
 
-    def __init__(self, window_size_min: int = 10):
+    def __init__(self, window_size_min: int = 20):
         self.__start_time = datetime.now()
         self.__end_time = datetime.now() + timedelta(minutes=window_size_min)
         self.time = self.__start_time + timedelta(minutes=round(window_size_min/2))

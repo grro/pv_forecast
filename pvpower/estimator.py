@@ -12,12 +12,14 @@ from pvpower.traindata import LabelledWeatherForecast, TrainData
 
 class Vectorizer(ABC):
 
-    def __init__(self, datetime_resolution_minutes: int = 20):
-        self._datetime_resolution_minutes = datetime_resolution_minutes
+    def __init__(self, datetime_resolution_minutes: int = 30):
+        self.__datetime_resolution_minutes = datetime_resolution_minutes
 
     def _utc_minutes_of_day(self, dt: datetime) -> int:
         utc_time = dt.astimezone(pytz.UTC)
-        return (utc_time.hour * 60) + utc_time.minute
+        minutes = (utc_time.hour * 60) + utc_time.minute
+        minutes_rounded = int(minutes/self.__datetime_resolution_minutes) * self.__datetime_resolution_minutes
+        return minutes_rounded
 
     def _scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
@@ -35,7 +37,7 @@ class CoreVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(self._utc_minutes_of_day(sample.time_utc), 24 * 60),
                       self._scale(sample.irradiance, 1000)]
         return vectorized
 
@@ -47,7 +49,7 @@ class SunshineVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(int(self._utc_minutes_of_day(sample.time_utc) / 10), int((24 * 60) / 10)),
+                      self._scale(self._utc_minutes_of_day(sample.time_utc), 24 * 60),
                       self._scale(sample.sunshine, 5000)]
         return vectorized
 
