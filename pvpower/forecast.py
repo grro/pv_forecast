@@ -7,22 +7,23 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog, TrainData
-from pvpower.estimator import Estimator, SMVEstimator, TrainReport
+from pvpower.estimator import Estimator, SMVEstimator, TrainReport, CoreVectorizer
 
 
 class ValueRecorder:
 
-    def __init__(self, window_size_min: int = 20):
-        self.__start_time = datetime.now()
-        self.__end_time = datetime.now() + timedelta(minutes=window_size_min)
-        self.time = self.__start_time + timedelta(minutes=round(window_size_min/2))
+    def __init__(self, window_size_min: int):
+        ts = int(datetime.now().timestamp() / (window_size_min*60)) * (window_size_min*60)
+        self.start_time = datetime.fromtimestamp(ts)
+        self.end_time = self.start_time + timedelta(minutes=window_size_min)
         self.__power_values = []
+        logging.info("value recorder created " + self.start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.end_time.strftime("%Y.%m.%d %H:%M"))
 
     def empty(self) -> bool:
         return len(self.__power_values) == 0
 
     def is_expired(self):
-        return datetime.now() > self.__end_time
+        return datetime.now() > self.end_time
 
     def add(self, value: int):
         self.__power_values.append(value)
@@ -35,7 +36,7 @@ class ValueRecorder:
             return int(sum(self.__power_values) / len(self.__power_values))
 
     def __str__(self):
-        return self.__start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.__end_time.strftime("%Y.%m.%d %H:%M") + "  average power: " + str(self.average) + " num probes: " + str(len(self.__power_values))
+        return self.start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.end_time.strftime("%Y.%m.%d %H:%M") + "  average power: " + str(self.average) + " num probes: " + str(len(self.__power_values))
 
 
 
@@ -44,6 +45,10 @@ class DefaultEstimator(Estimator):
     def __init__(self, estimator: Estimator, pv_forecast_dir: str):
         self.__estimator = estimator
         self.__pv_forecast_dir = pv_forecast_dir
+
+    @property
+    def datetime_resolution_minutes(self) -> int:
+        return self.__estimator.datetime_resolution_minutes
 
     @staticmethod
     def __filename() -> str:
@@ -71,33 +76,41 @@ class DefaultEstimator(Estimator):
             pass
 
     @staticmethod
-    def get(pv_forecast_dir: str):
+    def get(pv_forecast_dir: str, datetime_resolution_minutes: int):
         try:
             with open(DefaultEstimator.__filename(), 'rb') as file:
                 estimator = DefaultEstimator(pickle.load(file), pv_forecast_dir)
-                estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
-                logging.debug("default estimator " + str(estimator) + " loaded from pickle file (" + DefaultEstimator.__filename() + ") and retrained")
+                if estimator.datetime_resolution_minutes == datetime_resolution_minutes:
+                    estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
+                    logging.debug("default estimator " + str(estimator) + " loaded from pickle file (" + DefaultEstimator.__filename() + ") and retrained")
+                    return estimator
+                else:
+                    logging.info("datetime_resolution_minutes has been changed")
         except Exception as e:
-            estimator = DefaultEstimator(SMVEstimator(), pv_forecast_dir)
-            estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
-            logging.debug("default estimator " + str(estimator) + " created and trained")
+            logging.warning("error occurred loading estimator " + str(e))
+
+        estimator = DefaultEstimator(SMVEstimator(CoreVectorizer(datetime_resolution_minutes)), pv_forecast_dir)
+        estimator.retrain(TrainSampleLog(pv_forecast_dir).all())
+        logging.debug("default estimator " + str(estimator) + " created and trained")
         return estimator
 
     def __str__(self):
         return str(self.__estimator)
 
+
 class PvPowerForecast:
 
-    def __init__(self, station_id: str, pv_forecast_dir: str = None, estimator: Estimator = None):
+    def __init__(self, station_id: str, pv_forecast_dir: str = None, estimator: Estimator = None, datetime_resolution_minutes: int = 15):
+        self.__datetime_resolution_minutes = datetime_resolution_minutes
         if pv_forecast_dir is None:
             pv_forecast_dir = site_data_dir("pv_forecast", appauthor=False)
         self.train_log = TrainSampleLog(pv_forecast_dir)
         self.weather_forecast_service = WeatherStation(station_id)
-        self.__train_value_recorder = ValueRecorder()
         if estimator is None:
-            self.__estimator = DefaultEstimator.get(pv_forecast_dir)
+            self.__estimator = DefaultEstimator.get(pv_forecast_dir, self.__datetime_resolution_minutes)
         else:
             self.__estimator = estimator
+        self.__train_value_recorder = ValueRecorder(self.__estimator.datetime_resolution_minutes)
         self.__date_last_retrain = self.__estimator.date_last_train()
         self.__train_if_old(False)
 
@@ -105,14 +118,14 @@ class PvPowerForecast:
         if self.__train_value_recorder.is_expired():
             try:
                 if not self.__train_value_recorder.empty():
-                    weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.time)
+                    weather_sample = self.weather_forecast_service.forecast(self.__train_value_recorder.start_time)
                     if weather_sample is not None:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
                                                                           self.__train_value_recorder.average,
-                                                                          time=self.__train_value_recorder.time)
+                                                                          time=self.__train_value_recorder.start_time)
                         self.train_log.append(annotated_sample)
             finally:
-                self.__train_value_recorder = ValueRecorder()
+                self.__train_value_recorder = ValueRecorder(self.__datetime_resolution_minutes)
         self.__train_value_recorder.add(real_power)
 
     def predict(self, time: datetime) -> Optional[int]:

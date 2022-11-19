@@ -143,3 +143,4 @@ dmypy.json
 /pvpower/weather_forecast_old.py
 /pvpower/train.csv.gz
 /pvpower/dev_vectorizer_test.py
+/pvpower/dev_variants.py

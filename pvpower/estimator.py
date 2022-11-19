@@ -12,13 +12,13 @@ from pvpower.traindata import LabelledWeatherForecast, TrainData
 
 class Vectorizer(ABC):
 
-    def __init__(self, datetime_resolution_minutes: int = 30):
-        self.__datetime_resolution_minutes = datetime_resolution_minutes
+    def __init__(self, datetime_resolution_minutes: int = 15):
+        self.datetime_resolution_minutes = datetime_resolution_minutes
 
     def _utc_minutes_of_day(self, dt: datetime) -> int:
         utc_time = dt.astimezone(pytz.UTC)
         minutes = (utc_time.hour * 60) + utc_time.minute
-        minutes_rounded = int(minutes/self.__datetime_resolution_minutes) * self.__datetime_resolution_minutes
+        minutes_rounded = int(minutes / self.datetime_resolution_minutes) * self.datetime_resolution_minutes
         return minutes_rounded
 
     def _scale(self, value: int, max_value: int, digits=1) -> float:
@@ -211,6 +211,12 @@ class TestReport:
 
 class Estimator(ABC):
 
+
+    @property
+    @abstractmethod
+    def datetime_resolution_minutes(self) -> int:
+        pass
+
     @abstractmethod
     def date_last_train(self) -> datetime:
         pass
@@ -226,16 +232,17 @@ class Estimator(ABC):
 
 class SMVEstimator(Estimator):
 
-    def __init__(self, vectorizer: Vectorizer = None):
+    def __init__(self, vectorizer: Vectorizer):
         self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
-        if vectorizer is None:
-            self.__vectorizer = CoreVectorizer()
-        else:
-            self.__vectorizer = vectorizer
+        self.__vectorizer = vectorizer
         self.__date_last_train = datetime.fromtimestamp(0)
         self.__num_samples_last_train = 0
         self.__num_covered_days_last_train = 0
         self.__score = None
+
+    @property
+    def datetime_resolution_minutes(self) -> int:
+        return self.__vectorizer.datetime_resolution_minutes
 
     def date_last_train(self) -> datetime:
         return self.__date_last_train
@@ -260,7 +267,7 @@ class SMVEstimator(Estimator):
             else:
                 feature_vector = self.__vectorizer.vectorize(sample)
                 predicted = int(self.__clf.predict([feature_vector])[0])
-                #logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
+                logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
                 if predicted >= 0:
                     return predicted
                 else:
@@ -270,5 +277,5 @@ class SMVEstimator(Estimator):
             return 0
 
     def __str__(self):
-        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days)"
+        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days; datetime_resolution: " + str(self.datetime_resolution_minutes) + " min)"
 
