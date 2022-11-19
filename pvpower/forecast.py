@@ -17,7 +17,7 @@ class ValueRecorder:
         self.start_time = datetime.fromtimestamp(ts)
         self.end_time = self.start_time + timedelta(minutes=window_size_min)
         self.__power_values = []
-        logging.info("value recorder created " + self.start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.end_time.strftime("%Y.%m.%d %H:%M"))
+        logging.debug("value recorder created " + self.start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.end_time.strftime("%Y.%m.%d %H:%M"))
 
     def empty(self) -> bool:
         return len(self.__power_values) == 0
