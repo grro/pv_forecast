@@ -93,8 +93,8 @@ class TrainData:
     @staticmethod
     def __clean_data(samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
-        samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))
-        samples = [sample for sample in samples if sample.irradiance > 0]
+        samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))  # remove duplicates
+        samples = [sample for sample in samples if sample.irradiance > 0]   # remove 0 value records
         return samples
 
     @staticmethod
@@ -196,21 +196,15 @@ class TrainSampleLog:
             temp_file = os.path.join(tmp_dir, 'traindata.csv')
             with gzip.open(temp_file, "wb") as file:
                 file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
-                num_samples = len(train_data)
                 num_survived = 0
-                previous_sample = None
                 for sample in train_data:
                     expired = sample.time_utc < min_datetime.astimezone(pytz.UTC)
-                    duplicate = False
-                    if previous_sample is not None:
-                        duplicate = previous_sample.time_utc == sample.time_utc
-                    previous_sample = sample
-                    if not expired and not duplicate:
+                    if not expired:
                         num_survived += 1
                         line = sample.to_csv() + "\n"
                         file.write(line.encode(encoding='UTF-8'))
             shutil.move(temp_file, fn)
-            logging.info("train file " + fn + " compacted (" + str(num_samples - num_survived) + " of " + str(num_samples) + " removed)")
+            logging.info("train file " + fn + " compacted")
 
     def __str__(self):
         return "\n".join([sample.to_csv() for sample in self.all()])
