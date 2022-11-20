@@ -1,5 +1,4 @@
 import logging
-import pytz
 from dataclasses import dataclass
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -11,15 +10,6 @@ from pvpower.traindata import LabelledWeatherForecast, TrainData
 
 
 class Vectorizer(ABC):
-
-    def __init__(self, datetime_resolution_minutes: int = 15):
-        self.datetime_resolution_minutes = datetime_resolution_minutes
-
-    def _utc_minutes_of_day(self, dt: datetime) -> int:
-        utc_time = dt.astimezone(pytz.UTC)
-        minutes = (utc_time.hour * 60) + utc_time.minute
-        minutes_rounded = int(minutes / self.datetime_resolution_minutes) * self.datetime_resolution_minutes
-        return minutes_rounded
 
     def _scale(self, value: int, max_value: int, digits=1) -> float:
         if value == 0:
@@ -37,7 +27,7 @@ class CoreVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(self._utc_minutes_of_day(sample.time_utc), 24 * 60),
+                      self._scale(sample.time_utc.hour, 24),
                       self._scale(sample.irradiance, 1000)]
         return vectorized
 
@@ -49,7 +39,7 @@ class SunshineVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(self._utc_minutes_of_day(sample.time_utc), 24 * 60),
+                      self._scale(sample.time_utc.hour, 24),
                       self._scale(sample.sunshine, 5000)]
         return vectorized
 
@@ -211,10 +201,9 @@ class TestReport:
 
 class Estimator(ABC):
 
-
     @property
     @abstractmethod
-    def datetime_resolution_minutes(self) -> int:
+    def variant(self) -> str:
         pass
 
     @abstractmethod
@@ -230,7 +219,7 @@ class Estimator(ABC):
         pass
 
 
-class SMVEstimator(Estimator):
+class SVMEstimator(Estimator):
 
     def __init__(self, vectorizer: Vectorizer):
         self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
@@ -238,11 +227,10 @@ class SMVEstimator(Estimator):
         self.__date_last_train = datetime.fromtimestamp(0)
         self.__num_samples_last_train = 0
         self.__num_covered_days_last_train = 0
-        self.__score = None
 
     @property
-    def datetime_resolution_minutes(self) -> int:
-        return self.__vectorizer.datetime_resolution_minutes
+    def variant(self) -> str:
+        return type(self.__vectorizer).__name__
 
     def date_last_train(self) -> datetime:
         return self.__date_last_train
@@ -257,6 +245,8 @@ class SMVEstimator(Estimator):
             self.__num_samples_last_train = len(samples)
             self.__num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in samples]))
             logging.debug("estimator has been (re)trained " + str(self))
+        else:
+            logging.debug("estimator can not be trained. Insufficient train data")
         return TrainReport(samples)
 
     def predict(self, sample: WeatherForecast) -> int:
@@ -277,5 +267,5 @@ class SMVEstimator(Estimator):
             return 0
 
     def __str__(self):
-        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; deviation: " + ("unknown" if self.__score is None else str(round(self.__score, 1)) +"%") + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days; datetime_resolution: " + str(self.datetime_resolution_minutes) + " min)"
+        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days)"
 

@@ -126,11 +126,8 @@ class TrainSampleLog:
         self.__dirname = dirname
         self.__last_compaction_time = datetime.now() - timedelta(days=self.COMPACTION_PERIOD_DAYS*2)
 
-    def filename(self, compressed: bool = False):
-        if compressed:
-            fn = os.path.join(self.__dirname, "train.csv.gz")
-        else:
-            fn = os.path.join(self.__dirname, "train.csv")
+    def filename(self):
+        fn = os.path.join(self.__dirname, "train.csv.gz")
         if not exists(fn):
             directory = Path(fn).parent
             if not exists(directory):
@@ -139,8 +136,7 @@ class TrainSampleLog:
 
     def append(self, sample: LabelledWeatherForecast):
         with self.lock:
-            # compressed file
-            compr_fn = self.filename(compressed=True)
+            compr_fn = self.filename()
             with gzip.open(compr_fn, "ab") as file:
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
@@ -152,24 +148,7 @@ class TrainSampleLog:
 
     def all(self) -> TrainData:
         with self.lock:
-            # plain file
-            fn = self.filename()
-            if exists(fn):
-                try:
-                    with open(fn, "rb") as file:
-                        lines = [raw_line.decode('UTF-8').strip() for raw_line in file.readlines()]
-                        samples = []
-                        for line in lines:
-                            try:
-                                samples.append(LabelledWeatherForecast.from_csv(line))
-                            except Exception as e:
-                                logging.warning(e)
-                        return TrainData(samples)
-                except Exception as e:
-                    logging.warning("error occurred loading " + fn + " " + str(e))
-
-            # compressed file
-            compr_fn = self.filename(compressed=True)
+            compr_fn = self.filename()
             if exists(compr_fn):
                 try:
                     with gzip.open(compr_fn, "rb") as file:
@@ -188,7 +167,7 @@ class TrainSampleLog:
     def compact(self, delay_sec:int = 0):
         sleep(delay_sec)
 
-        fn = self.filename(compressed=True)
+        fn = self.filename()
         train_data = self.all()
         min_datetime = datetime.now() - timedelta(days=400)
 
