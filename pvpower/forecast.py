@@ -27,7 +27,7 @@ class ValueRecorder:
 
     def add(self, value: int):
         self.__power_values.append(value)
-        logging.debug("record added to value recorder (" + str(self) + ")")
+        #logging.debug("record added to value recorder (" + str(self) + ")")
 
     @property
     def average(self) -> Optional[int]:
