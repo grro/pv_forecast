@@ -93,25 +93,21 @@ class TrainData:
     @staticmethod
     def __clean_data(samples: List[LabelledWeatherForecast]) -> List[LabelledWeatherForecast]:
         seen = list()
-        samples = list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))  # remove duplicates
-        samples = [sample for sample in samples if sample.irradiance > 0]   # remove 0 value records
-        return samples
+        return list(filter(lambda sample: seen.append(sample.time_utc) is None if sample.time_utc not in seen else False, samples))  # remove duplicates
 
-    @staticmethod
-    def __rotate(samples: List[LabelledWeatherForecast], offset_percent: int) -> List[LabelledWeatherForecast]:
-        step = int(offset_percent * len(samples) / 100)
-        return samples[step:] + samples[:step]
+    def rotated(self, offset_percent: int):
+        step = int(offset_percent * len(self.samples) / 100)
+        return TrainData(self.samples[step:] + self.samples[:step])
 
-    def split(self, ratio_percent:int = 67, offset_percent: int = 0):
-        rotated_samples = self.__rotate(self.samples, offset_percent)
-        size = len(rotated_samples)
+    def split(self, ratio_percent:int = 67):
+        size = len(self.samples)
         left = []
         right = []
         for i in range(0, size):
             if i > round(size * ratio_percent / 100, 0):
-                right.append(rotated_samples[i])
+                right.append(self.samples[i])
             else:
-                left.append(rotated_samples[i])
+                left.append(self.samples[i])
         return TrainData(left), TrainData(right)
 
     def __str__(self):
