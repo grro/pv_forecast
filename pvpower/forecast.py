@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog, TrainData
-from pvpower.estimator import Estimator, SVMEstimator, TrainReport, CoreVectorizer
+from pvpower.estimator import Estimator, SVMEstimator, TrainReport, FullVectorizer
 
 
 class ValueRecorder:
@@ -90,7 +90,7 @@ class PvPowerForecast:
         self.train_log = TrainSampleLog(pv_forecast_dir)
         self.__train_value_recorder = ValueRecorder()
         self.weather_forecast_service = WeatherStation(station_id)
-        self.__estimator = estimator if estimator is not None else PersistentEstimator(SVMEstimator(CoreVectorizer()))
+        self.__estimator = estimator if estimator is not None else PersistentEstimator(SVMEstimator(FullVectorizer()))
         self.__date_last_retrain_initiated = self.__estimator.date_last_train()
         self.__train_if_old(False)
 

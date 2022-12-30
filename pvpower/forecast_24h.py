@@ -39,17 +39,33 @@ class TimeFrame:
         return self.__str__()
 
     def __str__(self) -> str:
-        return self.__hourly_forecasts[0].time.strftime("%H:%M") + "->" + self.__hourly_forecasts[-1].time.strftime("%H") + ":00" + "; expected power/hour: " + ", ".join([str(hourly_forecast.power_watt)  + " watt" for hourly_forecast in self.__hourly_forecasts])
+        return self.start_time.strftime("%H:%M") + "->" + self.end_time.strftime("%H:%M") + "; expected power/hour: " + ", ".join([str(hourly_forecast.power_watt)  + " watt" for hourly_forecast in self.__hourly_forecasts])
+
 
 
 class TimeFrames:
 
+    @staticmethod
+    def of(frames: List[TimeFrame]):
+        return  TimeFrames(sorted(frames, key=lambda frame: "{0:10d}".format(1000000-frame.power_total) + frame.start_time.strftime("%d.%m.%Y %H"), reverse=False))
+
     def __init__(self, frames: List[TimeFrame]):
-        self.__frames = sorted(frames, key=lambda frame: "{0:10d}".format(1000000-frame.power_total) + frame.start_time.strftime("%d.%m.%Y %H"), reverse=False)
+        self.__frames = frames
 
     def filter(self, min_watt_per_hour: int):
         filtered_frames = [frame for frame in self.__frames if max(sorted(frame.hourly_power)) > min_watt_per_hour]
-        return TimeFrames(filtered_frames)
+        full_frames = [frame for frame in filtered_frames if (len([power for power in frame.hourly_power if power >= min_watt_per_hour]) == len(frame.hourly_power))]
+        if len(full_frames) > 0:
+            non_overlapping_full_frames = [full_frames[0]]
+            for frame in full_frames:
+                if frame.start_time > non_overlapping_full_frames[-1].end_time:
+                    non_overlapping_full_frames.append(frame)
+
+            frames = [frame for frame in filtered_frames if frame not in non_overlapping_full_frames]
+            frames = non_overlapping_full_frames + frames
+            return TimeFrames(frames)
+        else:
+            return TimeFrames(filtered_frames)
 
     def empty(self) -> bool:
         return len(self.__frames) == 0
@@ -135,7 +151,7 @@ class Next24hours:
             frame = TimeFrame(forecasts)
             frames.append(frame)
         frames = [frame for frame in frames if frame.start_time <= (datetime.now() + timedelta(hours=24))]
-        return TimeFrames(frames)
+        return TimeFrames.of(frames)
 
     def __str__(self):
         txt = "time ................ pv power ..... irradiance ....... sunshine .... visibility .... fog probab. .... cloud cover\n"
