@@ -23,7 +23,7 @@ class ValueRecorder:
         return len(self.__power_values) == 0
 
     def is_expired(self):
-        return datetime.now() > self.end_time
+        return datetime.now() >= self.end_time
 
     def add(self, value: int):
         self.__power_values.append(value)

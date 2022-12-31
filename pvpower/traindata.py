@@ -44,16 +44,6 @@ class LabelledWeatherForecast(WeatherForecast):
     def __to_string(value):
         return "" if value is None else str(value)
 
-    def to_csv(self) -> str:
-        utc_time = self.time_utc
-        return utc_time.strftime("%d.%m.%Y %H:%M") + ";" + \
-               LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
-               LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
-               LabelledWeatherForecast.__to_string(self.sunshine) + ";" + \
-               LabelledWeatherForecast.__to_string(self.cloud_cover) + ";" + \
-               LabelledWeatherForecast.__to_string(self.probability_for_fog) + ";" + \
-               LabelledWeatherForecast.__to_string(self.visibility)
-
     @staticmethod
     def csv_header() -> str:
         return "utc_time;real_pv_power;irradiance;sunshine;cloud_cover;probability_for_fog;visibility"
@@ -65,10 +55,20 @@ class LabelledWeatherForecast(WeatherForecast):
         else:
             return None
 
+    def to_csv(self) -> str:
+        utc_time = self.time_utc
+        return utc_time.isoformat() + ";" + \
+               LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
+               LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
+               LabelledWeatherForecast.__to_string(self.sunshine) + ";" + \
+               LabelledWeatherForecast.__to_string(self.cloud_cover) + ";" + \
+               LabelledWeatherForecast.__to_string(self.probability_for_fog) + ";" + \
+               LabelledWeatherForecast.__to_string(self.visibility)
+
     @staticmethod
     def from_csv(line: str):
         parts = line.split(";")
-        utc_time = datetime.strptime(parts[0] + ":00+00:00", "%d.%m.%Y %H:%M:%S%z")
+        utc_time = datetime.fromisoformat(parts[0])
         real_pv_power = LabelledWeatherForecast.__to_int(parts[1])
         irradiance = LabelledWeatherForecast.__to_int(parts[2])
         sunshine = LabelledWeatherForecast.__to_int(parts[3])
@@ -116,6 +116,7 @@ class TrainData:
 
 class TrainSampleLog:
     COMPACTION_PERIOD_DAYS = 15
+    FILENAME = "train.csv.gz"
 
     def __init__(self, dirname: str):
         self.lock = RLock()
@@ -123,7 +124,7 @@ class TrainSampleLog:
         self.__last_compaction_time = datetime.now() - timedelta(days=self.COMPACTION_PERIOD_DAYS*2)
 
     def filename(self):
-        fn = os.path.join(self.__dirname, "train.csv.gz")
+        fn = os.path.join(self.__dirname, self.FILENAME)
         if not exists(fn):
             directory = Path(fn).parent
             if not exists(directory):
@@ -136,7 +137,7 @@ class TrainSampleLog:
             with gzip.open(compr_fn, "ab") as file:
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
-            logging.debug("train record appended " + str(sample))
+            logging.info("train record appended " + str(sample))
 
         if datetime.now() > (self.__last_compaction_time + timedelta(days=self.COMPACTION_PERIOD_DAYS)):
             self.__last_compaction_time = datetime.now()
