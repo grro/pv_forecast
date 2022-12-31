@@ -1,6 +1,6 @@
 import logging
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from pvpower.mosmix import MemoryCachedMosmixLoader
 from typing import Optional
 
@@ -34,7 +34,7 @@ class WeatherForecast:
                                self.visibility)
 
     def __str__(self):
-        return self.time_utc.isoformat() + " (" + self.time.isoformat() + ")" + \
+        return self.time_utc.strftime("%H") + ":00-" + (self.time_utc + timedelta(hours=1)).strftime("%H") + ":00 (utc)" + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
                ", cloud_cover=" + str(round(self.cloud_cover)) + \

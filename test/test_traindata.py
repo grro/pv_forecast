@@ -13,7 +13,9 @@ class TestTrainSampleLog(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdirname:
             log = TrainSampleLog(tmpdirname)
             dt1 = datetime.strptime("2021.11.30T13:30", "%Y.%m.%dT%H:%M")
-            log.append(LabelledWeatherForecast(dt1, 100, 200, 300, 400, 500, 99))
+            sample = LabelledWeatherForecast(dt1, 100, 200, 300, 400, 500, 99)
+            print(sample)
+            log.append(sample)
 
             with gzip.open(path.join(tmpdirname, TrainSampleLog.FILENAME), 'rb') as f:
                 lines = [raw_line.decode('UTF-8').strip() for raw_line in f.readlines()]
