@@ -79,6 +79,10 @@ class LabelledWeatherForecast(WeatherForecast):
         return sample
 
 
+    def __str__(self):
+        return super().__str__() + ", power_watt=" + str(self.power_watt)
+
+
 class TrainData:
 
     def __init__(self, samples: List[LabelledWeatherForecast]):
