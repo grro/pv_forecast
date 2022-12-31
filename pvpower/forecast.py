@@ -49,6 +49,7 @@ class PersistentEstimator(Estimator):
             makedirs(cache_dir)
         self.__filename = path.join(cache_dir, 'Estimator_' + default_estimator.variant + '.p')
         self.__estimator = default_estimator
+        self.__date_last_train = datetime.fromtimestamp(0)
         if exists(self.__filename):
             try:
                 with open(self.__filename, 'rb') as file:
@@ -62,7 +63,7 @@ class PersistentEstimator(Estimator):
         return self.__estimator.variant
 
     def date_last_train(self) -> datetime:
-        return self.__estimator.date_last_train()
+        return self.__date_last_train
 
     def predict(self, sample: WeatherForecast) -> int:
         return self.__estimator.predict(sample)
@@ -70,6 +71,7 @@ class PersistentEstimator(Estimator):
     def retrain(self, train_data: TrainData) -> TrainReport:
         train_report = self.__estimator.retrain(train_data)
         self.__store()
+        self.__date_last_train = datetime.now()
         return train_report
 
     def __store(self):
