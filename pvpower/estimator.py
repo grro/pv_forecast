@@ -127,11 +127,6 @@ class FullVectorizer(CoreVectorizer):
         return "FullVectorizer"
 
 
-@dataclass(frozen=True)
-class TrainReport:
-    samples: List[LabelledWeatherForecast]
-
-
 class Estimator(ABC):
 
     @property
@@ -144,7 +139,7 @@ class Estimator(ABC):
         pass
 
     @abstractmethod
-    def retrain(self, train_data: TrainData) -> TrainReport:
+    def retrain(self, train_data: TrainData):
         pass
 
     @abstractmethod
@@ -168,7 +163,7 @@ class SVMEstimator(Estimator):
     def date_last_train(self) -> datetime:
         return self.__date_last_train
 
-    def retrain(self, train_data: TrainData) -> TrainReport:
+    def retrain(self, train_data: TrainData):
         samples = train_data.samples
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
         label_list = [sample.power_watt for sample in samples]
@@ -180,7 +175,6 @@ class SVMEstimator(Estimator):
             logging.debug("estimator has been trained " + str(self))
         else:
             logging.debug("estimator can not be trained. Insufficient train data")
-        return TrainReport(samples)
 
     def predict(self, sample: WeatherForecast) -> int:
         if sample.irradiance > 0:   # shortcut. no irradiance means no power

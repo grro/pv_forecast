@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog, TrainData
-from pvpower.estimator import Estimator, SVMEstimator, TrainReport, FullVectorizer
+from pvpower.estimator import Estimator, SVMEstimator, FullVectorizer
+from pvpower.trainingcenter import TrainingCenter
 
 
 class ValueRecorder:
@@ -68,11 +69,10 @@ class PersistentEstimator(Estimator):
     def predict(self, sample: WeatherForecast) -> int:
         return self.__estimator.predict(sample)
 
-    def retrain(self, train_data: TrainData) -> TrainReport:
-        train_report = self.__estimator.retrain(train_data)
+    def retrain(self, train_data: TrainData):
+        self.__estimator.retrain(train_data)
         self.__store()
         self.__date_last_train = datetime.now()
-        return train_report
 
     def __store(self):
         try:
@@ -90,11 +90,12 @@ class PvPowerForecast:
     def __init__(self, station_id: str, pv_forecast_dir: None, estimator: Estimator = None):
         pv_forecast_dir = pv_forecast_dir if pv_forecast_dir is not None else site_data_dir("pv_forecast", appauthor=False)
         self.train_log = TrainSampleLog(pv_forecast_dir)
+        self.__trainingcenter = TrainingCenter()
         self.__train_value_recorder = ValueRecorder()
         self.weather_forecast_service = WeatherStation(station_id)
         self.__estimator = estimator if estimator is not None else PersistentEstimator(SVMEstimator(FullVectorizer()))
         self.__date_last_retrain_initiated = self.__estimator.date_last_train()
-        self.__train_if_old(False)
+        self.__retrain_period_hours = 14 * 24
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -125,15 +126,15 @@ class PvPowerForecast:
         try:
             return self.__estimator.predict(sample)
         finally:
-            self.__train_if_old()
+            self.__retrain_if_older_than(self.__retrain_period_hours)
 
-    def __train_if_old(self, background: bool = True):
-        if datetime.now() > (self.__date_last_retrain_initiated + timedelta(minutes=3 * 60)):
+    def __retrain_if_older_than(self, hours: int):
+        if datetime.now() > (self.__date_last_retrain_initiated + timedelta(hours=hours)):
             self.__date_last_retrain_initiated = datetime.now()
-            if background:
-                Thread(target=self.__estimator.retrain, daemon=True, args=(self.train_log.all(),)).start()
-            else:
-                self.__estimator.retrain(self.train_log.all())
+            Thread(target=self.__retrain, daemon=True).start()
+
+    def __retrain(self):
+        self.__estimator = self.__trainingcenter.new_estimator(self.train_log.all())
 
     def __str__(self):
         return str(self.__estimator)
