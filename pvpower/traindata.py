@@ -141,7 +141,6 @@ class TrainSampleLog:
             with gzip.open(compr_fn, "ab") as file:
                 line = sample.to_csv() + "\n"
                 file.write(line.encode(encoding='UTF-8'))
-            logging.info("train record appended " + str(sample))
 
         if datetime.now() > (self.__last_compaction_time + timedelta(days=self.COMPACTION_PERIOD_DAYS)):
             self.__last_compaction_time = datetime.now()

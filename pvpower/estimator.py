@@ -27,7 +27,7 @@ class CoreVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(sample.time_utc.hour, 24),
+                      self._scale(12-abs(12-sample.time_utc.hour), 12),
                       self._scale(sample.irradiance, 1000)]
         return vectorized
 
