@@ -97,7 +97,7 @@ class TrainingCenter:
 
         train_runs = []
         for estimator in estimators:
-            runs = sorted([TrainRun(estimator, trainData.rotated(i * 23)) for i in range(0, 6)])
+            runs = sorted([TrainRun(estimator, trainData.rotated(i * 17)) for i in range(0, 7)])
             cleaned_runs = [run for run in runs if run.score < 10000]
             if len(cleaned_runs) > 0:
                 runs = cleaned_runs
