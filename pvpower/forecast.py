@@ -3,7 +3,7 @@ import pickle
 from os import path, makedirs
 from os.path import exists
 from appdirs import user_cache_dir, site_data_dir
-from threading import Thread
+from threading import Thread, Lock
 from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
@@ -63,6 +63,9 @@ class PersistentEstimator(Estimator):
     def variant(self) -> str:
         return self.__estimator.variant
 
+    def num_samples_last_train(self) -> int:
+        return self.__estimator.num_samples_last_train()
+
     def date_last_train(self) -> datetime:
         return self.__date_last_train
 
@@ -90,12 +93,12 @@ class PvPowerForecast:
     def __init__(self, station_id: str, pv_forecast_dir: None, estimator: Estimator = None):
         pv_forecast_dir = pv_forecast_dir if pv_forecast_dir is not None else site_data_dir("pv_forecast", appauthor=False)
         self.train_log = TrainSampleLog(pv_forecast_dir)
-        self.__trainingcenter = TrainingCenter()
+        self.__training_center = TrainingCenter()
+        self.lock = Lock()
         self.__train_value_recorder = ValueRecorder()
         self.weather_forecast_service = WeatherStation(station_id)
         self.__estimator = estimator if estimator is not None else PersistentEstimator(SVMEstimator(FullVectorizer()))
         self.__date_last_retrain_initiated = self.__estimator.date_last_train()
-        self.__retrain_period_hours = 14 * 24
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -126,15 +129,15 @@ class PvPowerForecast:
         try:
             return self.__estimator.predict(sample)
         finally:
-            self.__retrain_if_older_than(self.__retrain_period_hours)
-
-    def __retrain_if_older_than(self, hours: int):
-        if datetime.now() > (self.__date_last_retrain_initiated + timedelta(hours=hours)):
-            self.__date_last_retrain_initiated = datetime.now()
-            Thread(target=self.__retrain, daemon=True).start()
+            # retrain is old estimator
+            retrain_period_hours = 1*24 if self.__estimator.num_samples_last_train() < 1000 else 19*24
+            with self.lock:
+                if datetime.now() > (self.__date_last_retrain_initiated + timedelta(hours=retrain_period_hours)):
+                    self.__date_last_retrain_initiated = datetime.now()
+                    Thread(target=self.__retrain, daemon=True).start()
 
     def __retrain(self):
-        self.__estimator = self.__trainingcenter.new_estimator(self.train_log.all())
+        self.__estimator = self.__training_center.new_estimator(self.train_log.all())
 
     def __str__(self):
         return str(self.__estimator)

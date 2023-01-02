@@ -14,45 +14,35 @@ class TrainRun:
         self.predictions = [estimator.predict(validation_record) for validation_record in self.validation_samples]
         self.estimator.retrain(train_data)  # retrain with all data
 
-    def __percent(self, real, predicted):
-        if real == 0 and predicted == 0:
+    def __derivation(self, real, predicted):
+        if abs(real - predicted) < 10: # ignore diff < 10
             return 0
         elif real == 0 or predicted == 0:
-            return 10000
+            return 999999
         else:
-            return round((predicted * 100 / real) - 100, 2)
+            return round((predicted * 100 / real) - 100, 1)
 
-    def __diff_all(self) -> List[float]:
-        diff_total = []
+
+    @property
+    def score(self) -> float:
+        derivation_total = []
         for i in range(len(self.validation_samples)):
             if self.validation_samples[i].irradiance == 0:
                 continue
             else:
                 predicted = self.predictions[i]
+            diff = self.__derivation(self.validation_samples[i].power_watt, predicted)
+            derivation_total.append(diff)
 
-            real = self.validation_samples[i].power_watt
-            if real == 0:
-                if predicted == 0:     # ignore true 0 predictions to void wasting the score
-                    diff = 0
-                else:
-                    diff = 10000
-            else:
-                if real < 10 and abs(predicted - real) < 10:  # ignore diff < 10
-                    diff = 0
-                else:
-                    diff = self.__percent(real, predicted)
-            diff_total.append(diff)
-        return sorted(diff_total)
-
-    @property
-    def score(self) -> float:
-        values = sorted(list(self.__diff_all()))
-        values = values[2:-2]
-        abs_values = [abs(value) for value in values]
-        if len(abs_values) == 0:
-            return 10000
+        derivations = sorted([abs(value) for value in derivation_total])
+        ignore_size = int(len(derivations) * 0.05)
+        if ignore_size <= 0:
+            ignore_size = 1
+        derivations = derivations[ignore_size:-ignore_size]
+        if len(derivations) == 0:
+            return 222222
         else:
-            return round(sum(abs_values) / len(abs_values), 2)
+            return round(sum(derivations) / len(derivations), 2)
 
     def __lt__(self, other):
         return self.score < other.score
@@ -66,9 +56,9 @@ class TrainRun:
     def __str__(self):
         txt = str(self.estimator) + "\n"
         txt += "derivation:  " + str(self.score) + " \n"
-        txt += '{:14s}        {:14s} {:14s} {:14s} {:14s} {:14s}         {:10s} {:10s}           {:10s}\n'.format("time", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog", "real", "predicted", "diff[%]")
+        txt += '{:14s}        {:14s} {:14s} {:14s} {:14s} {:14s}         {:10s} {:10s}           {:10s}\n'.format("time", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog", "real", "predicted", "derivation[%]")
         for i in range(0, len(self.validation_samples)):
-            txt += '{:<14s}        {:<14d} {:<14d} {:<14d} {:<14d}  {:<14d}        {:<10d} {:<10d}           {:<10d}\n'.format(self.validation_samples[i].time.strftime("%d.%b  %H:%M"),
+            txt += '{:<14s}        {:<14d} {:<14d} {:<14d} {:<14d}  {:<14d}        {:<10d} {:<10d}           {:<10s}\n'.format(self.validation_samples[i].time.strftime("%d.%b  %H:%M"),
                                                                                                                                self.validation_samples[i].irradiance,
                                                                                                                                self.validation_samples[i].sunshine,
                                                                                                                                self.validation_samples[i].cloud_cover,
@@ -76,7 +66,7 @@ class TrainRun:
                                                                                                                                self.validation_samples[i].probability_for_fog,
                                                                                                                                self.validation_samples[i].power_watt,
                                                                                                                                self.predictions[i],
-                                                                                                                               int(self.__percent(self.validation_samples[i].power_watt, self.predictions[i])))
+                                                                                                                               str(int(self.__derivation(self.validation_samples[i].power_watt, self.predictions[i]))) + " %")
         return txt
 
 

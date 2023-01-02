@@ -139,6 +139,10 @@ class Estimator(ABC):
         pass
 
     @abstractmethod
+    def num_samples_last_train(self) -> int:
+        pass
+
+    @abstractmethod
     def retrain(self, train_data: TrainData):
         pass
 
@@ -162,6 +166,9 @@ class SVMEstimator(Estimator):
 
     def date_last_train(self) -> datetime:
         return self.__date_last_train
+
+    def num_samples_last_train(self) -> int:
+        return self.__num_samples_last_train
 
     def retrain(self, train_data: TrainData):
         samples = train_data.samples

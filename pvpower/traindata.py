@@ -169,7 +169,7 @@ class TrainSampleLog:
 
         fn = self.filename()
         train_data = self.all()
-        min_datetime = datetime.now() - timedelta(days=400)
+        min_datetime = datetime.now() - timedelta(days=4*365)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_file = os.path.join(tmp_dir, 'traindata.csv')
