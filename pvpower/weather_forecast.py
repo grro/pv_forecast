@@ -23,7 +23,9 @@ class WeatherForecast:
 
     @property
     def time(self) -> datetime:
-        return datetime.strptime((self.time_utc + (datetime.now() - datetime.utcnow())).strftime("%d.%m.%Y %H:%M:%S"), "%d.%m.%Y %H:%M:%S")
+        offset_hour = round((datetime.now() - datetime.utcnow()).total_seconds() / (60 * 60))
+        return datetime.strptime((self.time_utc + timedelta(hours=offset_hour)).strftime("%d.%m.%Y %H:%M:%S"), "%d.%m.%Y %H:%M:%S")
+
 
     def with_time(self, dt: datetime):
         return WeatherForecast(dt,
