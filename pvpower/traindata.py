@@ -21,11 +21,11 @@ class LabelledWeatherForecast(WeatherForecast):
                  time: datetime,
                  irradiance: int,
                  sunshine: int,
-                 cloud_cover: int,
+                 cloud_cover_effective: int,
                  probability_for_fog: int,
                  visibility: int,
                  power_watt: int):
-        super().__init__(time, irradiance, sunshine, cloud_cover, probability_for_fog, visibility)
+        super().__init__(time, irradiance, sunshine, cloud_cover_effective, probability_for_fog, visibility)
         self.power_watt = power_watt
 
 
@@ -35,7 +35,7 @@ class LabelledWeatherForecast(WeatherForecast):
         return LabelledWeatherForecast(weather_forecast.time_utc if time is None else time,
                                        weather_forecast.irradiance,
                                        weather_forecast.sunshine,
-                                       weather_forecast.cloud_cover,
+                                       weather_forecast.cloud_cover_effective,
                                        weather_forecast.probability_for_fog,
                                        weather_forecast.visibility,
                                        power_watt)
@@ -61,7 +61,7 @@ class LabelledWeatherForecast(WeatherForecast):
                LabelledWeatherForecast.__to_string(self.power_watt) + ";" + \
                LabelledWeatherForecast.__to_string(self.irradiance) + ";" + \
                LabelledWeatherForecast.__to_string(self.sunshine) + ";" + \
-               LabelledWeatherForecast.__to_string(self.cloud_cover) + ";" + \
+               LabelledWeatherForecast.__to_string(self.cloud_cover_effective) + ";" + \
                LabelledWeatherForecast.__to_string(self.probability_for_fog) + ";" + \
                LabelledWeatherForecast.__to_string(self.visibility)
 

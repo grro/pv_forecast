@@ -50,7 +50,7 @@ class SunshineVectorizer(Vectorizer):
 class SushinePlusCloudCoverVectorizer(SunshineVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        return super().vectorize(sample) +  [self._scale(sample.cloud_cover, 200)]
+        return super().vectorize(sample) +  [self._scale(sample.cloud_cover_effective, 200)]
 
     def __str__(self):
         return "Sunshine+CloudVectorizer"
@@ -78,7 +78,7 @@ class PlusSunshineVectorizer(CoreVectorizer):
 class PlusCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
-        return super().vectorize(sample) +  [self._scale(sample.cloud_cover, 200)]
+        return super().vectorize(sample) +  [self._scale(sample.cloud_cover_effective, 200)]
 
     def __str__(self):
         return "Core+CloudVectorizer"
@@ -98,7 +98,7 @@ class PlusVisibilityCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
-                                             self._scale(sample.cloud_cover, 200)]
+                                             self._scale(sample.cloud_cover_effective, 200)]
 
     def __str__(self):
         return "Core+Visibility+CloudVectorizer"
@@ -108,7 +108,7 @@ class PlusVisibilityFogCloudCoverVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
-                                             self._scale(sample.cloud_cover, 200),
+                                             self._scale(sample.cloud_cover_effective, 200),
                                              self._scale(sample.probability_for_fog, 100)]
 
     def __str__(self):
@@ -119,7 +119,7 @@ class FullVectorizer(CoreVectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         return super().vectorize(sample) +  [self._scale(sample.visibility, 50000),
-                                             self._scale(sample.cloud_cover, 200),
+                                             self._scale(sample.cloud_cover_effective, 200),
                                              self._scale(sample.probability_for_fog, 100),
                                              self._scale(sample.sunshine, 5000)]
 

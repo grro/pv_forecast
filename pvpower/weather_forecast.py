@@ -11,13 +11,13 @@ class WeatherForecast:
                  time: datetime,
                  irradiance: int,
                  sunshine: int,
-                 cloud_cover: int,
+                 cloud_cover_effective: int,
                  probability_for_fog: int,
                  visibility: int):
         self.time_utc = time.astimezone(pytz.UTC)
         self.irradiance = irradiance
         self.sunshine = sunshine
-        self.cloud_cover = cloud_cover
+        self.cloud_cover_effective = cloud_cover_effective
         self.probability_for_fog = probability_for_fog
         self.visibility = visibility
 
@@ -29,7 +29,7 @@ class WeatherForecast:
         return WeatherForecast(dt,
                                self.irradiance,
                                self.sunshine,
-                               self.cloud_cover,
+                               self.cloud_cover_effective,
                                self.probability_for_fog,
                                self.visibility)
 
@@ -37,7 +37,7 @@ class WeatherForecast:
         return self.time_utc.strftime("%H") + ":00-" + (self.time_utc + timedelta(hours=1)).strftime("%H") + ":00 (utc)" + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
-               ", cloud_cover=" + str(round(self.cloud_cover)) + \
+               ", cloud_cover_effective=" + str(round(self.cloud_cover_effective)) + \
                ", probability_for_fog=" + str(round(self.probability_for_fog)) + \
                ", visibility=" + str(round(self.visibility))
 
@@ -58,12 +58,12 @@ class WeatherStation:
 
         mosmix = self.__mosmix_loader.get()
         if mosmix.supports(time):
-            forecast = WeatherForecast(time,
-                                       round(mosmix.rad1h(time)),
-                                       round(mosmix.sund1(time)),
-                                       round(mosmix.neff(time)),
-                                       round(mosmix.wwm(time)),
-                                       round(mosmix.vv(time)))
+            forecast = WeatherForecast(time=time,
+                                       irradiance=round(mosmix.rad1h(time)),
+                                       sunshine=round(mosmix.sund1(time)),
+                                       cloud_cover_effective=round(mosmix.neff(time)),
+                                       probability_for_fog=round(mosmix.wwm(time)),
+                                       visibility=round(mosmix.vv(time)))
             return forecast
         else:
             logging.info("forecast record for " + time.strftime("%Y.%m.%d %H:%M") + " not available. Returning None (current mosmix: " + str(mosmix) + ")")

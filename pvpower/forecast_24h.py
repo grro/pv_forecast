@@ -161,7 +161,7 @@ class Next24hours:
             visibility = str(round(self.__predicted_power[time].visibility))
             sunshine = str(round(self.__predicted_power[time].sunshine))
             probability_for_fog = str(round(self.__predicted_power[time].probability_for_fog))
-            cloud_cover = str(round(self.__predicted_power[time].cloud_cover))
+            cloud_cover = str(round(self.__predicted_power[time].cloud_cover_effective))
             txt += time.strftime("%d %b, %H:%M") + " " + \
                    "".join(["."] * (10 - len(power))) + " " + power + " watt " + \
                    "".join(["."] * (15 - len(irradiance))) + " " + irradiance + " " + \

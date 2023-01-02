@@ -118,6 +118,8 @@ class ParameterUtcSeries:
         return ParameterUtcSeries(series)
 
 
+# https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_parameteruebersicht.pdf?__blob=publicationFile&v=3
+
 class MosmixS:
 
     @staticmethod
@@ -167,8 +169,19 @@ class MosmixS:
     def sund1(self, dt: datetime) -> float:
         return self.__parameter_series["SunD1"].value_at(dt)
 
+    ''' https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/faq/faq_mosmix_node.html
+       Der effektive Bedeckungsgrad berechnet sich als arithmetisches Mittel aus 
+       dem Gesamtbedeckungsgrad und dem Bedeckungsgrad tiefer und mittlerer Wolken 
+       (Wolkenbedeckungsgrad für <7000m). Bei 8/8 Cirrusbewölkung mit Bedeckungsgrad
+       0/8 an mittleren und tiefen Wolken beträgt der effektive Bedeckungsgrad also 4/8,
+       bei 8/8 Stratus und 0/8 hoher Bewölkung beträgt der effektive Bedeckungsgrad 8/8, usw.
+    '''
     def neff(self, dt: datetime) -> float:
         return self.__parameter_series["Neff"].value_at(dt)
+
+    # https://www.dwd.de/DE/service/lexikon/Functions/glossar.html?nn=103346&lv2=100932&lv3=101016
+    def n(self, dt: datetime) -> float:
+        return self.__parameter_series["N"].value_at(dt)
 
     def wwm(self, dt: datetime) -> float:
         return self.__parameter_series["wwM"].value_at(dt)
