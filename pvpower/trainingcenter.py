@@ -15,9 +15,8 @@ class TrainRun:
         self.predictions = [estimator.predict(validation_record) for validation_record in self.validation_samples]
         self.estimator.retrain(train_data)  # retrain with all data
 
-    def __score(self, real, predicted):
-        distance = abs(real - predicted)
-        return distance
+    def __score(self, real, predicted)-> int:
+        return round(abs(real - predicted) / 10)*10
 
     @property
     def score(self) -> float:
@@ -28,8 +27,8 @@ class TrainRun:
             if real == 0 and predicted == 0:   # do not waste the total score by true zero predictions
                 continue
             scores.append(self.__score(real, predicted))
-        scores = self.__without_outliners(scores, 0.1)
-        return mean(scores)
+        scores_without_outliners = self.__without_outliners(scores, 0.1)
+        return mean(scores_without_outliners)
 
     @staticmethod
     def __without_outliners(scores: List[int], percent: float) -> List[int]:

@@ -28,7 +28,7 @@ class CoreVectorizer(Vectorizer):
 
     def vectorize(self, sample: WeatherForecast) -> List[float]:
         vectorized = [self._scale(sample.time_utc.month, 12),
-                      self._scale(12-abs(12-sample.time_utc.hour), 12),
+                      self._scale(sample.time_utc.hour, 24),
                       self._scale(sample.irradiance, 1000)]
         return vectorized
 
@@ -207,6 +207,7 @@ class SVMEstimator(Estimator):
     def retrain(self, train_data: TrainData):
         start = time.time()
         samples = train_data.samples
+        samples = [sample for sample in samples if sample.irradiance > 0]  # do not train the estimator for zero irradiance
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
         label_list = [sample.power_watt for sample in samples]
         if len(set(label_list)) > 1:
