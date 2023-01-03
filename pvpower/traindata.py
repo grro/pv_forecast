@@ -5,6 +5,7 @@ import shutil
 import gzip
 import tempfile
 from time import sleep
+from appdirs import site_data_dir
 from threading import Thread
 from pathlib import Path
 from os.path import exists
@@ -122,9 +123,9 @@ class TrainSampleLog:
     COMPACTION_PERIOD_DAYS = 15
     FILENAME = "train.csv.gz"
 
-    def __init__(self, dirname: str):
+    def __init__(self, dirname: str = None):
         self.lock = RLock()
-        self.__dirname = dirname
+        self.__dirname = dirname if dirname is not None else site_data_dir("pv_power", appauthor=False)
         self.__last_compaction_time = datetime.now() - timedelta(days=self.COMPACTION_PERIOD_DAYS*2)
 
     def filename(self):

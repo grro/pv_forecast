@@ -1,15 +1,10 @@
 import logging
-import pickle
-from os import path, makedirs
-from os.path import exists
-from appdirs import user_cache_dir, site_data_dir
-from threading import Thread, Lock
 from datetime import datetime, timedelta
 from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
-from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog, TrainData
-from pvpower.estimator import Estimator, SVMEstimator, FullVectorizer
-from pvpower.trainingcenter import TrainingCenter
+from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
+from pvpower.estimator import Estimator
+from pvpower.persistent_estimator import PersistentEstimator
 
 
 class ValueRecorder:
@@ -41,64 +36,13 @@ class ValueRecorder:
         return self.start_time.strftime("%Y.%m.%d %H:%M") + " -> " + self.end_time.strftime("%Y.%m.%d %H:%M") + "  average power: " + str(self.average) + " num probes: " + str(len(self.__power_values))
 
 
-
-class PersistentEstimator(Estimator):
-
-    def __init__(self, default_estimator: Estimator):
-        cache_dir = user_cache_dir("pv_forecast", appauthor=False)
-        if not path.exists(cache_dir):
-            makedirs(cache_dir)
-        self.__filename = path.join(cache_dir, 'Estimator_' + default_estimator.variant + '.p')
-        self.__estimator = default_estimator
-        self.__date_last_train = datetime.fromtimestamp(0)
-        if exists(self.__filename):
-            try:
-                with open(self.__filename, 'rb') as file:
-                    self.__estimator = pickle.load(file)
-                    logging.debug("estimator " + str(self.__estimator) + " loaded from pickle file (" + self.__filename + ")")
-            except Exception as e:
-                logging.warning("error occurred loading estimator " + str(e))
-
-    @property
-    def variant(self) -> str:
-        return self.__estimator.variant
-
-    def num_samples_last_train(self) -> int:
-        return self.__estimator.num_samples_last_train()
-
-    def date_last_train(self) -> datetime:
-        return self.__date_last_train
-
-    def predict(self, sample: WeatherForecast) -> int:
-        return self.__estimator.predict(sample)
-
-    def retrain(self, train_data: TrainData):
-        self.__estimator.retrain(train_data)
-        self.__store()
-        self.__date_last_train = datetime.now()
-
-    def __store(self):
-        try:
-            with open(self.__filename, 'wb') as file:
-                pickle.dump(self.__estimator, file)
-        except Exception as e:
-            pass
-
-    def __str__(self):
-        return str(self.__estimator)
-
-
 class PvPowerForecast:
 
     def __init__(self, station_id: str, pv_forecast_dir: None, estimator: Estimator = None):
-        pv_forecast_dir = pv_forecast_dir if pv_forecast_dir is not None else site_data_dir("pv_forecast", appauthor=False)
-        self.train_log = TrainSampleLog(pv_forecast_dir)
-        self.__training_center = TrainingCenter()
-        self.lock = Lock()
         self.__train_value_recorder = ValueRecorder()
         self.weather_forecast_service = WeatherStation(station_id)
-        self.__estimator = estimator if estimator is not None else PersistentEstimator(SVMEstimator(FullVectorizer()))
-        self.__date_last_retrain_initiated = self.__estimator.date_last_train()
+        self.train_log = TrainSampleLog(pv_forecast_dir)
+        self.__estimator = estimator if estimator is not None else PersistentEstimator(self.train_log)
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():
@@ -126,18 +70,7 @@ class PvPowerForecast:
             return self.predict_by_weather_forecast(sample)
 
     def predict_by_weather_forecast(self, sample: WeatherForecast) -> int:
-        try:
-            return self.__estimator.predict(sample)
-        finally:
-            # retrain is old estimator
-            retrain_period_hours = 1*24 if self.__estimator.num_samples_last_train() < 1000 else 19*24
-            with self.lock:
-                if datetime.now() > (self.__date_last_retrain_initiated + timedelta(hours=retrain_period_hours)):
-                    self.__date_last_retrain_initiated = datetime.now()
-                    Thread(target=self.__retrain, daemon=True).start()
-
-    def __retrain(self):
-        self.__estimator = self.__training_center.new_estimator(self.train_log.all())
+        return self.__estimator.predict(sample)
 
     def __str__(self):
         return str(self.__estimator)

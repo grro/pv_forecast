@@ -1,4 +1,5 @@
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -129,7 +130,6 @@ class FullVectorizer(CoreVectorizer):
 
 class Estimator(ABC):
 
-    @property
     @abstractmethod
     def variant(self) -> str:
         pass
@@ -140,6 +140,10 @@ class Estimator(ABC):
 
     @abstractmethod
     def num_samples_last_train(self) -> int:
+        pass
+
+    @abstractmethod
+    def duration_sec_last_train(self) -> float:
         pass
 
     @abstractmethod
@@ -151,32 +155,66 @@ class Estimator(ABC):
         pass
 
 
+class DelegatingEstimator(Estimator):
+
+    def __init__(self, estimator: Estimator):
+        self._estimator = estimator
+
+    def variant(self) -> str:
+        return self._estimator.variant()
+
+    def date_last_train(self) -> datetime:
+        return self._estimator.date_last_train()
+
+    def duration_sec_last_train(self) -> float:
+        return self._estimator.duration_sec_last_train()
+
+    def num_samples_last_train(self) -> int:
+        return self._estimator.num_samples_last_train()
+
+    def retrain(self, train_data: TrainData):
+        self._estimator.retrain(train_data)
+
+    def predict(self, sample: WeatherForecast) -> int:
+        return self._estimator.predict(sample)
+
+    def __str__(self):
+        return str(self._estimator)
+
+
 class SVMEstimator(Estimator):
 
     def __init__(self, vectorizer: Vectorizer):
         self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
         self.__vectorizer = vectorizer
         self.__date_last_train = datetime.fromtimestamp(0)
+        self.__duration_last_train_sec = 0.0
         self.__num_samples_last_train = 0
         self.__num_covered_days_last_train = 0
 
-    @property
     def variant(self) -> str:
         return type(self.__vectorizer).__name__
 
     def date_last_train(self) -> datetime:
         return self.__date_last_train
 
+    def duration_sec_last_train(self) -> float:
+        return self.__duration_last_train_sec
+
     def num_samples_last_train(self) -> int:
         return self.__num_samples_last_train
 
     def retrain(self, train_data: TrainData):
+        start = time.time()
         samples = train_data.samples
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
         label_list = [sample.power_watt for sample in samples]
         if len(set(label_list)) > 1:
             self.__clf.fit(feature_vector_list, label_list)
+
             self.__date_last_train = datetime.now()
+            self.__duration_last_train_sec = time.time() - start
+
             self.__num_samples_last_train = len(samples)
             self.__num_covered_days_last_train = len(set([sample.time.strftime("%Y.%m.%d") for sample in samples]))
             logging.debug("estimator has been trained " + str(self))
@@ -201,5 +239,7 @@ class SVMEstimator(Estimator):
             return 0
 
     def __str__(self):
-        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.__num_samples_last_train) + " samples; age " + str(datetime.now() - self.date_last_train()) + "; time range: " + str(self.__num_covered_days_last_train) + " days)"
+        return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.__num_samples_last_train) + \
+               " samples; duration " +  str(round(self.__duration_last_train_sec, 3)) + " sec; age " + \
+               str(datetime.now() - self.__date_last_train) + "; time range: " + str(self.__num_covered_days_last_train) + " days)"
 
