@@ -35,7 +35,8 @@ class WeatherForecast:
                                self.visibility)
 
     def __str__(self):
-        return self.time_utc.strftime("%H") + ":00-" + (self.time_utc + timedelta(hours=1)).strftime("%H") + ":00 (utc)" + \
+        return self.time.strftime("%H") + ":00-" + (self.time + timedelta(hours=1)).strftime("%H") + ":00 " + \
+               "(" + self.time_utc.strftime("%H") + ":00-" + (self.time_utc + timedelta(hours=1)).strftime("%H") + ":00 utc)" + \
                ", irradiance=" + str(round(self.irradiance)) + \
                ", sunshine=" + str(round(self.sunshine)) + \
                ", cloud_cover_effective=" + str(round(self.cloud_cover_effective)) + \

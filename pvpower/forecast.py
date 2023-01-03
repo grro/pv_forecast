@@ -4,7 +4,7 @@ from typing import Optional
 from pvpower.weather_forecast import WeatherStation, WeatherForecast
 from pvpower.traindata import LabelledWeatherForecast, TrainSampleLog
 from pvpower.estimator import Estimator
-from pvpower.persistent_estimator import PersistentEstimator
+from pvpower.refreshing_estimator import AutoRefreshingEstimator
 
 
 class ValueRecorder:
@@ -42,7 +42,7 @@ class PvPowerForecast:
         self.__train_value_recorder = ValueRecorder()
         self.weather_forecast_service = WeatherStation(station_id)
         self.train_log = TrainSampleLog(pv_forecast_dir)
-        self.__estimator = estimator if estimator is not None else PersistentEstimator(self.train_log)
+        self.__estimator = estimator if estimator is not None else AutoRefreshingEstimator(self.train_log)
 
     def add_current_power_reading(self, real_power: int):
         if self.__train_value_recorder.is_expired():

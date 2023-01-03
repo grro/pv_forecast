@@ -11,18 +11,18 @@ from pvpower.estimator import Estimator, DelegatingEstimator, SVMEstimator, Full
 from pvpower.trainingcenter import TrainingCenter
 
 
-class PersistentEstimator(DelegatingEstimator):
+class AutoRefreshingEstimator(DelegatingEstimator):
 
     def __init__(self, train_log: TrainSampleLog):
         self.__train_log = train_log
         self.__lock = Lock()
         self.__training_center = TrainingCenter()
         self.__date_last_retrain_initiated = datetime.fromtimestamp(0)
-        super(PersistentEstimator, self).__init__(PersistentEstimator.__load())
+        super().__init__(AutoRefreshingEstimator.__load())
 
     def predict(self, sample: WeatherForecast) -> int:
         try:
-            return super(PersistentEstimator, self).predict(sample)
+            return super().predict(sample)
         finally:
             try:
                 retrain_period_days = 1 + (self.duration_sec_last_train() * 7 * 24)  # min 1 day + 7 days per 1 sec traintime
@@ -41,7 +41,7 @@ class PersistentEstimator(DelegatingEstimator):
     @staticmethod
     def __store(estimator: Estimator):
         try:
-            with open(PersistentEstimator.__filename(), 'wb') as file:
+            with open(AutoRefreshingEstimator.__filename(), 'wb') as file:
                 pickle.dump(estimator, file)
         except Exception as e:
             logging.warning("error occurred storing pickled estimator " + str(e))
@@ -49,11 +49,11 @@ class PersistentEstimator(DelegatingEstimator):
     @staticmethod
     def __load() -> Estimator:
         estimator = SVMEstimator(FullVectorizer())
-        if exists(PersistentEstimator.__filename()):
+        if exists(AutoRefreshingEstimator.__filename()):
             try:
-                with open(PersistentEstimator.__filename(), 'rb') as file:
+                with open(AutoRefreshingEstimator.__filename(), 'rb') as file:
                     estimator = pickle.load(file)
-                    logging.debug("estimator " + str(estimator) + " loaded from pickle file (" + PersistentEstimator.__filename() + ")")
+                    logging.debug("estimator " + str(estimator) + " loaded from pickle file (" + AutoRefreshingEstimator.__filename() + ")")
             except Exception as e:
                 logging.warning("error occurred loading estimator " + str(e))
         return estimator
