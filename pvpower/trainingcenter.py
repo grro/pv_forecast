@@ -1,5 +1,6 @@
 import logging
-import math
+from typing import List
+from statistics import mean
 from pvpower.estimator import Estimator, SVMEstimator, FullVectorizer, CoreVectorizer, SunshineVectorizer, PlusVisibilityVectorizer, SushinePlusCloudCoverVectorizer, PlusSunshineVectorizer, PlusCloudCoverVectorizer, PlusVisibilitySunshineVectorizer, PlusVisibilityCloudCoverVectorizer, PlusVisibilityFogCloudCoverVectorizer
 from pvpower.traindata import TrainData
 
@@ -15,26 +16,28 @@ class TrainRun:
         self.estimator.retrain(train_data)  # retrain with all data
 
     def __score(self, real, predicted):
-        rounded_real = round(real/10)*10
-        rounded_predicted = round(predicted/10)*10
-        score = abs(rounded_real - rounded_predicted)
-        return score
+        distance = abs(real - predicted)
+        return distance
 
     @property
     def score(self) -> float:
         scores = []
         for i in range(len(self.validation_samples)):
-            scores.append(self.__score(self.validation_samples[i].power_watt, self.predictions[i]))
+            real = self.validation_samples[i].power_watt
+            predicted = self.predictions[i]
+            if real == 0 and predicted == 0:   # do not waste the total score by true zero predictions
+                continue
+            scores.append(self.__score(real, predicted))
+        scores = self.__without_outliners(scores, 0.1)
+        return mean(scores)
 
-        scores = sorted(scores)
-        ignore_size = int(len(scores) * 0.1)
+    @staticmethod
+    def __without_outliners(scores: List[int], percent: float) -> List[int]:
+        scores = sorted(list(scores))
+        ignore_size = int(len(scores) * percent)
         if ignore_size <= 0:
             ignore_size = 1
-        scores = scores[ignore_size:-ignore_size]
-        if len(scores) == 0:
-            return 999999
-        else:
-            return round(sum(scores) / len(scores), 2)
+        return scores[ignore_size:-ignore_size]
 
     def __lt__(self, other):
         return self.score < other.score
