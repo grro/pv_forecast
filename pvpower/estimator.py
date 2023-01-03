@@ -207,7 +207,7 @@ class SVMEstimator(Estimator):
     def retrain(self, train_data: TrainData):
         start = time.time()
         samples = train_data.samples
-        samples = [sample for sample in samples if sample.irradiance > 0]  # do not train the estimator for zero irradiance
+        samples = [sample for sample in samples if sample.irradiance > 0]  # special handling zero irradiance records
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
         label_list = [sample.power_watt for sample in samples]
         if len(set(label_list)) > 1:
@@ -223,7 +223,7 @@ class SVMEstimator(Estimator):
             logging.debug("estimator can not be trained. Insufficient train data")
 
     def predict(self, sample: WeatherForecast) -> int:
-        if sample.irradiance > 0:   # shortcut. no irradiance means no power
+        if sample.irradiance > 0:   # special handling zero irradiance records. no irradiance means no power
             if self.__num_samples_last_train < 1:
                 logging.warning("estimator has not been trained (insufficient train data available). returning 0")
                 return 0

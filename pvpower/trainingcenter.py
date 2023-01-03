@@ -28,7 +28,7 @@ class TrainRun:
                 continue
             scores.append(self.__score(real, predicted))
         scores_without_outliners = self.__without_outliners(scores, 0.1)
-        return mean(scores_without_outliners)
+        return round(mean(scores_without_outliners), 2)
 
     @staticmethod
     def __without_outliners(scores: List[int], percent: float) -> List[int]:
