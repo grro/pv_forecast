@@ -182,10 +182,33 @@ class DelegatingEstimator(Estimator):
         return str(self._estimator)
 
 
-class SVMEstimator(Estimator):
+class ZeroIrradianceFilteringEstimator(Estimator):
+
+    def retrain(self, train_data: TrainData):
+        # special handling zero irradiance records
+        samples = [sample for sample in train_data.samples if sample.irradiance > 0]
+        self._do_retrain(TrainData(samples))
+
+    @abstractmethod
+    def _do_retrain(self, train_data: TrainData):
+        pass
+
+    def predict(self, sample: WeatherForecast) -> int:
+        # special handling zero irradiance records. no irradiance means no power
+        if sample.irradiance > 0:
+            return self._do_predict(sample)
+        else:
+            return 0
+
+    @abstractmethod
+    def _do_predict(self, sample: WeatherForecast) -> int:
+        pass
+
+
+class SVMEstimator(ZeroIrradianceFilteringEstimator):
 
     def __init__(self, vectorizer: Vectorizer):
-        self.__clf = svm.SVC(kernel='poly') # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
+        self.__clf = svm.SVC(kernel='poly')   # it seems that the SVM approach produces good predictions. refer https://www.sciencedirect.com/science/article/pii/S136403212200274X?via%3Dihub and https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.221.4021&rep=rep1&type=pdf
         self.__vectorizer = vectorizer
         self.__date_last_train = datetime.fromtimestamp(0)
         self.__duration_last_train_sec = 0.0
@@ -204,10 +227,9 @@ class SVMEstimator(Estimator):
     def num_samples_last_train(self) -> int:
         return self.__num_samples_last_train
 
-    def retrain(self, train_data: TrainData):
+    def _do_retrain(self, train_data: TrainData):
         start = time.time()
         samples = train_data.samples
-        samples = [sample for sample in samples if sample.irradiance > 0]  # special handling zero irradiance records
         feature_vector_list = [self.__vectorizer.vectorize(sample) for sample in samples]
         label_list = [sample.power_watt for sample in samples]
         if len(set(label_list)) > 1:
@@ -222,22 +244,19 @@ class SVMEstimator(Estimator):
         else:
             logging.debug("estimator can not be trained. Insufficient train data")
 
-    def predict(self, sample: WeatherForecast) -> int:
-        if sample.irradiance > 0:   # special handling zero irradiance records. no irradiance means no power
-            if self.__num_samples_last_train < 1:
-                logging.warning("estimator has not been trained (insufficient train data available). returning 0")
-                return 0
-            else:
-                feature_vector = self.__vectorizer.vectorize(sample)
-                predicted = int(self.__clf.predict([feature_vector])[0])
-                logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
-                if predicted >= 0:
-                    return predicted
-                else:
-                    logging.debug("predicted value is " + str(predicted) + " correct them to 0")
-                    return 0
-        else:
+    def _do_predict(self, sample: WeatherForecast) -> int:
+        if self.__num_samples_last_train < 1:
+            logging.warning("estimator has not been trained (insufficient train data available). returning 0")
             return 0
+        else:
+            feature_vector = self.__vectorizer.vectorize(sample)
+            predicted = int(self.__clf.predict([feature_vector])[0])
+            logging.debug(str(predicted) + " watt predicted for " + str(sample) + " (features: " + str(feature_vector) + ")")
+            if predicted >= 0:
+                return predicted
+            else:
+                logging.debug("predicted value is " + str(predicted) + " correct them to 0")
+                return 0
 
     def __str__(self):
         return "SVMEstimator(vectorizer=" + str(self.__vectorizer) + "; trained with " + str(self.__num_samples_last_train) + \

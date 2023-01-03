@@ -176,15 +176,14 @@ class TrainSampleLog:
             temp_file = os.path.join(tmp_dir, 'traindata.csv')
             with gzip.open(temp_file, "wb") as file:
                 file.write((LabelledWeatherForecast.csv_header() + "\n").encode(encoding='UTF-8'))
-                num_survived = 0
+                num_written = 0
                 for sample in train_data:
-                    expired = sample.time_utc < min_datetime.astimezone(pytz.UTC)
-                    if not expired:
-                        num_survived += 1
+                    if not sample.time_utc < min_datetime.astimezone(pytz.UTC):
                         line = sample.to_csv() + "\n"
                         file.write(line.encode(encoding='UTF-8'))
+                        num_written += 1
             shutil.move(temp_file, fn)
-            logging.info("train file " + fn + " compacted")
+            logging.info("train file " + fn + " compacted  (" + str(len(train_data)) + " > " + str(num_written) + ")")
 
     def __str__(self):
         return "\n".join([sample.to_csv() for sample in self.all()])
