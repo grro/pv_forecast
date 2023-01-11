@@ -57,13 +57,13 @@ class TrainRun:
         for i in range(0, len(self.validation_samples)):
             if self.validation_samples[i].irradiance == 0 and self.predictions[i] == 0:
                 if not is_skipped:
-                    txt += '....'
+                    txt += '....\n'
                 is_skipped = True
                 continue
             else:
                 is_skipped = False
             if num_considered > max_lines:
-                txt += '....'
+                txt += '....\n'
                 break
             num_considered += 1
             txt += '{:<25s}   {:<10d} {:<10d}    {:<10s}          {:<14d} {:<14d} {:<14s} {:<14d}  {:<14d}        \n'.format(self.validation_samples[i].time.strftime("%d.%b %H:%M") + " (" + self.validation_samples[i].time_utc.strftime("%H:%M") + " utc)",
