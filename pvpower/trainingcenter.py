@@ -48,14 +48,18 @@ class TrainRun:
         return self.__str__()
 
     def __str__(self):
+        num_considered = 0
         max_lines = 1000
         txt = str(self.estimator) + "\n"
         txt += "score:  " + str(self.score) + " (smaller is better)\n"
         txt += '{:25s}   {:10s} {:10s}    {:10s}          {:14s} {:14s} {:14s} {:14s} {:14s}         \n'.format("time", "real", "predicted", "score", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog")
         for i in range(0, len(self.validation_samples)):
-            if i > max_lines:
+            if self.validation_samples[i].irradiance == 0 and self.predictions[i] == 0:
+                continue
+            if num_considered > max_lines:
                 txt += '....'
                 break
+            num_considered += 1
             txt += '{:<25s}   {:<10d} {:<10d}    {:<10s}          {:<14d} {:<14d} {:<14s} {:<14d}  {:<14d}        \n'.format(self.validation_samples[i].time.strftime("%d.%b %H:%M") + " (" + self.validation_samples[i].time_utc.strftime("%H:%M") + " utc)",
                                                                                                                                self.validation_samples[i].power_watt,
                                                                                                                                self.predictions[i],
