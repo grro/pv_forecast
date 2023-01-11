@@ -50,12 +50,18 @@ class TrainRun:
     def __str__(self):
         num_considered = 0
         max_lines = 1000
+        is_skipped = False
         txt = str(self.estimator) + "\n"
         txt += "score:  " + str(self.score) + " (smaller is better)\n"
         txt += '{:25s}   {:10s} {:10s}    {:10s}          {:14s} {:14s} {:14s} {:14s} {:14s}         \n'.format("time", "real", "predicted", "score", "irradiance", "sunshine", "cloud_cover", "visibility", "proba.fog")
         for i in range(0, len(self.validation_samples)):
             if self.validation_samples[i].irradiance == 0 and self.predictions[i] == 0:
+                if not is_skipped:
+                    txt += '....'
+                is_skipped = True
                 continue
+            else:
+                is_skipped = False
             if num_considered > max_lines:
                 txt += '....'
                 break
