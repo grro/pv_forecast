@@ -53,7 +53,6 @@ class PvPowerForecast:
                         annotated_sample = LabelledWeatherForecast.create(weather_sample,
                                                                           self.__train_value_recorder.average,
                                                                           time=self.__train_value_recorder.start_time)
-                        logging.info("add train sample " + str(annotated_sample))
                         self.train_log.append(annotated_sample)
             finally:
                 self.__train_value_recorder = ValueRecorder()

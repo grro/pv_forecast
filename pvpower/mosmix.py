@@ -274,7 +274,6 @@ class FileCachedMosmixLoader(MosmixLoader):
         new_mosmix = self.__parent_loader.get()
         merged_mosmix = new_mosmix.merge(mosmix)
         merged_mosmix.save(cache_filename)
-        logging.info("Mosmix file updated " + str(merged_mosmix))
         return merged_mosmix
 
 
